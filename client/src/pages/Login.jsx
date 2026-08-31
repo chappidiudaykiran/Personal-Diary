@@ -15,18 +15,31 @@ export default function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.email || !form.password) {
+    const identifier = form.email.trim();
+    const password = form.password;
+
+    if (!identifier || !password) {
       toast.error('Please fill in all fields');
       return;
     }
 
     setLoading(true);
     try {
-      await login({ email: form.email, password: form.password });
+      await login({ email: identifier, password });
       toast.success('Welcome back! 📖');
       navigate('/dashboard');
     } catch (err) {
-      const msg = err.response?.data?.message || 'Login failed. Check your credentials.';
+      console.error('Login error details:', err);
+      let msg = 'Login failed. Check your credentials.';
+      if (err.response?.data?.message) {
+        msg = err.response.data.message;
+      } else if (err.response?.data?.errors?.[0]?.msg) {
+        msg = err.response.data.errors[0].msg;
+      } else if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        msg = 'Server took too long to respond (cold start). Please try again in a few seconds.';
+      } else if (err.message && !err.response) {
+        msg = err.message;
+      }
       toast.error(msg);
     } finally {
       setLoading(false);
@@ -52,18 +65,21 @@ export default function Login() {
           <h2 className="text-xl font-semibold text-stone-700 mb-6">Sign in to your diary</h2>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Email */}
+            {/* Email or Username */}
             <div>
-              <label className="block text-sm font-medium text-stone-600 mb-1.5">Email</label>
+              <label className="block text-sm font-medium text-stone-600 mb-1.5">Email or Username</label>
               <input
-                type="email"
+                type="text"
                 name="email"
                 value={form.email}
                 onChange={handleChange}
-                placeholder="you@example.com"
+                placeholder="you@example.com or username"
                 className="w-full px-4 py-2.5 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition bg-stone-50"
                 required
-                autoComplete="email"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck="false"
+                autoComplete="username"
               />
             </div>
 
@@ -79,6 +95,9 @@ export default function Login() {
                   placeholder="Your password"
                   className="w-full px-4 py-2.5 pr-11 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition bg-stone-50"
                   required
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck="false"
                   autoComplete="current-password"
                 />
                 <button

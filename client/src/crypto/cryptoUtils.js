@@ -20,8 +20,18 @@ const SALT_BYTES = 32;
  * @returns {Promise<CryptoKey>}
  */
 export async function deriveKey(password, saltHex) {
+  if (!window?.crypto?.subtle) {
+    throw new Error(
+      'Web Crypto API is not available on this connection. Please use HTTPS or localhost to ensure encryption works.'
+    );
+  }
+
+  if (!saltHex || typeof saltHex !== 'string') {
+    throw new Error('Encryption salt is missing or invalid.');
+  }
+
   const enc = new TextEncoder();
-  const salt = hexToBytes(saltHex);
+  const salt = hexToBytes(saltHex.trim());
 
   // Import the raw password as a base key material
   const keyMaterial = await window.crypto.subtle.importKey(
@@ -59,6 +69,10 @@ export async function deriveKey(password, saltHex) {
  *          Both values are base64-encoded strings safe for JSON/DB storage.
  */
 export async function encrypt(key, plaintext) {
+  if (!window?.crypto?.subtle) {
+    throw new Error('Web Crypto API is not available.');
+  }
+
   const enc = new TextEncoder();
   const iv = window.crypto.getRandomValues(new Uint8Array(12)); // 96-bit IV for AES-GCM
 
@@ -84,6 +98,10 @@ export async function encrypt(key, plaintext) {
  * @returns {Promise<string>}    - The decrypted plaintext
  */
 export async function decrypt(key, ciphertext, iv) {
+  if (!window?.crypto?.subtle) {
+    throw new Error('Web Crypto API is not available.');
+  }
+
   const dec = new TextDecoder();
 
   const plaintextBuffer = await window.crypto.subtle.decrypt(
@@ -98,21 +116,29 @@ export async function decrypt(key, ciphertext, iv) {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function hexToBytes(hex) {
-  const bytes = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < hex.length; i += 2) {
-    bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
+  const clean = hex.trim();
+  const bytes = new Uint8Array(clean.length / 2);
+  for (let i = 0; i < clean.length; i += 2) {
+    bytes[i / 2] = parseInt(clean.slice(i, i + 2), 16);
   }
   return bytes;
 }
 
 function bytesToBase64(bytes) {
-  return btoa(String.fromCharCode(...bytes));
+  let binary = '';
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
 }
 
 function base64ToBytes(base64) {
-  return new Uint8Array(
-    atob(base64)
-      .split('')
-      .map((c) => c.charCodeAt(0))
-  );
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
 }

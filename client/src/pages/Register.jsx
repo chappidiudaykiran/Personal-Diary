@@ -26,22 +26,42 @@ export default function Register() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (form.password !== form.confirm) {
+    const username = form.username.trim();
+    const email = form.email.trim();
+    const password = form.password;
+    const confirm = form.confirm;
+
+    if (!username || !email || !password || !confirm) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+
+    if (password !== confirm) {
       toast.error('Passwords do not match');
       return;
     }
-    if (form.password.length < 8) {
+    if (password.length < 8) {
       toast.error('Password must be at least 8 characters');
       return;
     }
 
     setLoading(true);
     try {
-      await register({ username: form.username, email: form.email, password: form.password });
+      await register({ username, email, password });
       toast.success('Diary created! Welcome 🎉');
       navigate('/dashboard');
     } catch (err) {
-      const msg = err.response?.data?.message || 'Registration failed. Please try again.';
+      console.error('Registration error details:', err);
+      let msg = 'Registration failed. Please try again.';
+      if (err.response?.data?.message) {
+        msg = err.response.data.message;
+      } else if (err.response?.data?.errors?.[0]?.msg) {
+        msg = err.response.data.errors[0].msg;
+      } else if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        msg = 'Server took too long to respond (cold start). Please try again in a few seconds.';
+      } else if (err.message && !err.response) {
+        msg = err.message;
+      }
       toast.error(msg);
     } finally {
       setLoading(false);
@@ -80,6 +100,10 @@ export default function Register() {
                 maxLength={30}
                 className="w-full px-4 py-2.5 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition bg-stone-50"
                 required
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck="false"
+                autoComplete="username"
               />
             </div>
 
@@ -94,6 +118,9 @@ export default function Register() {
                 placeholder="you@example.com"
                 className="w-full px-4 py-2.5 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition bg-stone-50"
                 required
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck="false"
                 autoComplete="email"
               />
             </div>
@@ -111,6 +138,9 @@ export default function Register() {
                   minLength={8}
                   className="w-full px-4 py-2.5 pr-11 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition bg-stone-50"
                   required
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck="false"
                   autoComplete="new-password"
                 />
                 <button
@@ -144,6 +174,9 @@ export default function Register() {
                   placeholder="Re-enter password"
                   className="w-full px-4 py-2.5 pr-11 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition bg-stone-50"
                   required
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck="false"
                   autoComplete="new-password"
                 />
                 {form.confirm && form.confirm === form.password && (
