@@ -9,6 +9,7 @@ export default defineConfig({
   ],
   server: {
     port: 5173,
+    host: true, // Allows accessing from phone via local WiFi IP
     proxy: {
       '/api': {
         target: 'http://localhost:5000',

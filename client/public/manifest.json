@@ -1,0 +1,18 @@
+{
+  "name": "Personal Diary",
+  "short_name": "My Diary",
+  "description": "Personal Private Diary App",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0c0c17",
+  "theme_color": "#0c0c17",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
