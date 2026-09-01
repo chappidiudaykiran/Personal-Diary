@@ -1,32 +1,148 @@
-@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,300;1,9..144,400;1,9..144,600&family=Outfit:wght@300;400;500;600;700&display=swap');
+@import 'tailwindcss';
+
+:root {
+  --font-family-display: 'Fraunces', Georgia, serif;
+  --font-family-sans: 'Outfit', system-ui, sans-serif;
+
+  /* Default Dark Mode Theme */
+  --bg-app: #0c0c17;
+  --bg-surface: #11111e;
+  --bg-elevated: #181828;
+  --bg-raised: #1e1e30;
+  --bg-input: #181828;
+  --card-gradient: linear-gradient(145deg, #181828 0%, #141422 100%);
+  --panel-gradient: linear-gradient(160deg, #131322 0%, #10101c 100%);
+  --sidebar-gradient: linear-gradient(160deg, #101020 0%, #0a0a14 100%);
+  --nav-bg: rgba(11, 11, 22, 0.85);
+
+  --text-primary: #ede8d8;
+  --text-body: #c4bfb2;
+  --text-muted: #7a7490;
+  --text-ghost: #5a5670;
+
+  --gold: #c4913a;
+  --gold-light: #dba84a;
+  --gold-dim: #9a6e2a;
+  --gold-glow: rgba(196, 145, 58, 0.08);
+
+  --border-color: rgba(196, 145, 58, 0.12);
+  --border-bright: rgba(196, 145, 58, 0.35);
+  --scrollbar-thumb: rgba(196, 145, 58, 0.25);
+  --scrollbar-track: #0c0c17;
+  --skeleton-bg: linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 100%);
+}
+
+html.light {
+  /* Warm Parchment / Editorial Light Theme */
+  --bg-app: #faf7f2;
+  --bg-surface: #ffffff;
+  --bg-elevated: #f4efe6;
+  --bg-raised: #ede6d8;
+  --bg-input: #ffffff;
+  --card-gradient: linear-gradient(145deg, #ffffff 0%, #f9f6ef 100%);
+  --panel-gradient: linear-gradient(160deg, #ffffff 0%, #faf6ef 100%);
+  --sidebar-gradient: linear-gradient(160deg, #f4efe4 0%, #eae2d3 100%);
+  --nav-bg: rgba(250, 247, 242, 0.88);
+
+  --text-primary: #1f1b18;
+  --text-body: #4a423b;
+  --text-muted: #7d7268;
+  --text-ghost: #a69b91;
+
+  --gold: #b37d28;
+  --gold-light: #c89035;
+  --gold-dim: #8c601d;
+  --gold-glow: rgba(179, 125, 40, 0.09);
+
+  --border-color: rgba(179, 125, 40, 0.18);
+  --border-bright: rgba(179, 125, 40, 0.45);
+  --scrollbar-thumb: rgba(179, 125, 40, 0.25);
+  --scrollbar-track: #faf7f2;
+  --skeleton-bg: linear-gradient(90deg, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0.08) 50%, rgba(0,0,0,0.04) 100%);
+}
 
 @layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
-    @apply bg-amber-50 text-stone-800 font-sans antialiased;
+    font-family: 'Outfit', system-ui, sans-serif;
+    background-color: var(--bg-app);
+    color: var(--text-body);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.25s ease, color 0.25s ease;
+  }
+
+  ::-webkit-scrollbar {
+    width: 5px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 99px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--border-bright);
+  }
+
+  textarea {
+    resize: none;
+    font-family: 'Outfit', system-ui, sans-serif;
+  }
+
+  input, button {
+    font-family: inherit;
   }
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-}
-::-webkit-scrollbar-track {
-  @apply bg-amber-100;
-}
-::-webkit-scrollbar-thumb {
-  @apply bg-amber-400 rounded-full;
-}
-
-/* Textarea auto-resize feel */
-textarea {
-  resize: none;
-}
-
-/* Page fade-in animation */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.fade-up {
+  animation: fadeUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 .fade-in {
-  animation: fadeIn 0.3s ease-out;
+  animation: fadeIn 0.3s ease both;
+}
+
+.skeleton {
+  background: var(--skeleton-bg);
+  background-size: 200% auto;
+  animation: shimmer 1.4s linear infinite;
+}
+
+.gold-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--gold) 0%,
+    var(--gold-light) 50%,
+    var(--gold) 100%
+  );
+  background-size: 200% auto;
+  animation: shimmer 2.5s linear infinite;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }

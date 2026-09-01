@@ -1,218 +1,295 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { BookOpen, Lock, Eye, EyeOff, UserPlus, CheckCircle } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight, Check, BookOpen, Sun, Moon } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useTheme } from '../context/ThemeContext.jsx';
 
 export default function Register() {
   const { register } = useAuth();
+  const { isDark, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [form, setForm] = useState({ username: '', email: '', password: '', confirm: '' });
-  const [showPassword, setShowPassword] = useState(false);
+  const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  const update = (field, val) => setForm((f) => ({ ...f, [field]: val }));
 
-  const passwordStrength = () => {
+  const pwStrength = (() => {
     const p = form.password;
-    if (!p) return null;
-    if (p.length < 8) return { level: 'Weak', color: 'bg-red-400', width: 'w-1/4' };
-    if (p.length < 12) return { level: 'Fair', color: 'bg-yellow-400', width: 'w-2/4' };
-    if (p.length < 16 || !/[^a-zA-Z0-9]/.test(p)) return { level: 'Good', color: 'bg-amber-400', width: 'w-3/4' };
-    return { level: 'Strong', color: 'bg-green-500', width: 'w-full' };
-  };
+    if (!p) return 0;
+    let s = 0;
+    if (p.length >= 8) s++;
+    if (/[A-Z]/.test(p)) s++;
+    if (/[0-9]/.test(p)) s++;
+    if (/[^A-Za-z0-9]/.test(p)) s++;
+    return s;
+  })();
 
-  const strength = passwordStrength();
+  const strengthLabel = ['', 'Weak', 'Fair', 'Good', 'Strong'][pwStrength];
+  const strengthColor = ['', '#e05555', '#d4a24a', '#7fa35b', '#4a9a6a'][pwStrength];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const username = form.username.trim();
-    const email = form.email.trim();
-    const password = form.password;
-    const confirm = form.confirm;
-
-    if (!username || !email || !password || !confirm) {
-      toast.error('Please fill in all fields');
+    if (!form.username.trim() || !form.email.trim() || !form.password) {
+      setError('Please fill in all fields.');
+      return;
+    }
+    if (form.password.length < 8) {
+      setError('Password must be at least 8 characters.');
+      return;
+    }
+    if (form.password !== form.confirm) {
+      setError('Passwords do not match.');
       return;
     }
 
-    if (password !== confirm) {
-      toast.error('Passwords do not match');
-      return;
-    }
-    if (password.length < 8) {
-      toast.error('Password must be at least 8 characters');
-      return;
-    }
-
+    setError('');
     setLoading(true);
     try {
-      await register({ username, email, password });
+      await register({
+        username: form.username.trim(),
+        email: form.email.trim(),
+        password: form.password,
+      });
       toast.success('Diary created! Welcome 🎉');
       navigate('/dashboard');
     } catch (err) {
-      console.error('Registration error details:', err);
+      console.error('Registration error:', err);
       let msg = 'Registration failed. Please try again.';
       if (err.response?.data?.message) {
         msg = err.response.data.message;
       } else if (err.response?.data?.errors?.[0]?.msg) {
         msg = err.response.data.errors[0].msg;
-      } else if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
-        msg = 'Server took too long to respond (cold start). Please try again in a few seconds.';
-      } else if (err.message && !err.response) {
-        msg = err.message;
       }
+      setError(msg);
       toast.error(msg);
     } finally {
       setLoading(false);
     }
   };
 
+  const inputStyle = {
+    background: 'var(--bg-input)',
+    border: '1px solid var(--border-color)',
+    color: 'var(--text-primary)',
+  };
+  const focusIn = (e) => {
+    e.currentTarget.style.borderColor = 'var(--border-bright)';
+    e.currentTarget.style.boxShadow = '0 0 0 3px var(--gold-glow)';
+  };
+  const focusOut = (e) => {
+    e.currentTarget.style.borderColor = 'var(--border-color)';
+    e.currentTarget.style.boxShadow = 'none';
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-amber-500 rounded-2xl shadow-lg mb-4">
-            <BookOpen className="w-8 h-8 text-white" />
+    <div className="min-h-screen flex relative transition-colors duration-200" style={{ background: 'var(--bg-app)' }}>
+      {/* Top right theme toggle */}
+      <button
+        onClick={toggleTheme}
+        className="absolute top-5 right-5 z-30 p-2.5 rounded-xl border transition-all cursor-pointer shadow-sm hover:scale-105"
+        style={{
+          background: 'var(--bg-surface)',
+          borderColor: 'var(--border-color)',
+          color: 'var(--text-muted)',
+        }}
+        title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      >
+        {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-amber-700" />}
+      </button>
+
+      {/* Left panel */}
+      <div
+        className="hidden lg:flex flex-col justify-between w-[42%] flex-shrink-0 p-10 relative overflow-hidden"
+        style={{
+          background: 'var(--sidebar-gradient)',
+          borderRight: '1px solid var(--border-color)',
+        }}
+      >
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: 'radial-gradient(ellipse 80% 60% at 70% 40%, var(--gold-glow) 0%, transparent 70%)',
+          }}
+        />
+
+        <div className="relative flex items-center gap-3">
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center"
+            style={{ background: 'linear-gradient(135deg, #c4913a, #dba84a)' }}
+          >
+            <BookOpen className="w-4 h-4 text-[#0c0c17]" />
           </div>
-          <h1 className="text-3xl font-bold text-stone-800">My Private Diary</h1>
-          <p className="text-stone-500 mt-1 text-sm flex items-center justify-center gap-1">
-            <Lock className="w-3.5 h-3.5" /> Your thoughts, encrypted forever
-          </p>
+          <span className="font-display text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>My Diary</span>
         </div>
 
-        {/* Card */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 fade-in">
-          <h2 className="text-xl font-semibold text-stone-700 mb-6">Create your diary</h2>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Username */}
-            <div>
-              <label className="block text-sm font-medium text-stone-600 mb-1.5">Username</label>
-              <input
-                type="text"
-                name="username"
-                value={form.username}
-                onChange={handleChange}
-                placeholder="johndoe"
-                minLength={3}
-                maxLength={30}
-                className="w-full px-4 py-2.5 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition bg-stone-50"
-                required
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck="false"
-                autoComplete="username"
-              />
-            </div>
-
-            {/* Email */}
-            <div>
-              <label className="block text-sm font-medium text-stone-600 mb-1.5">Email</label>
-              <input
-                type="email"
-                name="email"
-                value={form.email}
-                onChange={handleChange}
-                placeholder="you@example.com"
-                className="w-full px-4 py-2.5 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition bg-stone-50"
-                required
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck="false"
-                autoComplete="email"
-              />
-            </div>
-
-            {/* Password */}
-            <div>
-              <label className="block text-sm font-medium text-stone-600 mb-1.5">Password</label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  name="password"
-                  value={form.password}
-                  onChange={handleChange}
-                  placeholder="Min. 8 characters"
-                  minLength={8}
-                  className="w-full px-4 py-2.5 pr-11 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition bg-stone-50"
-                  required
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck="false"
-                  autoComplete="new-password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 transition"
+        <div className="relative space-y-6">
+          <h2
+            className="font-display text-2xl leading-relaxed"
+            style={{ color: 'var(--text-primary)', fontWeight: 300, fontStyle: 'italic' }}
+          >
+            Begin the habit of writing to yourself.
+          </h2>
+          <div className="space-y-3">
+            {[
+              'Capture your thoughts and memories every day',
+              'Organize and filter by your mood',
+              'Access your private personal journal anytime',
+            ].map((item) => (
+              <div key={item} className="flex items-start gap-3 text-sm" style={{ color: 'var(--text-muted)' }}>
+                <div
+                  className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                  style={{ background: 'var(--gold-glow)', border: '1px solid var(--border-bright)' }}
                 >
-                  {showPassword ? <EyeOff className="w-4.5 h-4.5" /> : <Eye className="w-4.5 h-4.5" />}
-                </button>
-              </div>
-              {/* Strength bar */}
-              {strength && (
-                <div className="mt-2">
-                  <div className="h-1.5 bg-stone-100 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full transition-all duration-300 ${strength.color} ${strength.width}`} />
-                  </div>
-                  <p className="text-xs text-stone-400 mt-1">{strength.level} password</p>
+                  <Check className="w-2.5 h-2.5" style={{ color: 'var(--gold)' }} />
                 </div>
-              )}
-            </div>
+                {item}
+              </div>
+            ))}
+          </div>
+        </div>
 
-            {/* Confirm Password */}
-            <div>
-              <label className="block text-sm font-medium text-stone-600 mb-1.5">Confirm Password</label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  name="confirm"
-                  value={form.confirm}
-                  onChange={handleChange}
-                  placeholder="Re-enter password"
-                  className="w-full px-4 py-2.5 pr-11 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition bg-stone-50"
-                  required
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck="false"
-                  autoComplete="new-password"
-                />
-                {form.confirm && form.confirm === form.password && (
-                  <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-green-500" />
+        <p className="relative text-xs" style={{ color: 'var(--text-ghost)' }}>
+          Your thoughts. Your stories. Your journey.
+        </p>
+      </div>
+
+      {/* Right — form */}
+      <div className="flex-1 flex items-center justify-center p-6 sm:p-10">
+        <div className="w-full max-w-sm">
+          <div className="fade-up">
+            <h1 className="font-display text-3xl mb-1" style={{ color: 'var(--text-primary)', fontWeight: 400 }}>
+              Create your diary
+            </h1>
+            <p className="text-sm mb-8" style={{ color: 'var(--text-muted)' }}>
+              A quiet space for your thoughts.
+            </p>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {[
+                { field: 'username', label: 'Username', type: 'text', placeholder: 'yourname', autocomplete: 'username' },
+                { field: 'email', label: 'Email', type: 'email', placeholder: 'you@example.com', autocomplete: 'email' },
+              ].map(({ field, label, type, placeholder, autocomplete }) => (
+                <div key={field}>
+                  <label className="block text-xs font-medium mb-2 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                    {label}
+                  </label>
+                  <input
+                    type={type}
+                    value={form[field]}
+                    onChange={(e) => update(field, e.target.value)}
+                    placeholder={placeholder}
+                    autoComplete={autocomplete}
+                    autoCapitalize="none"
+                    className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all duration-150"
+                    style={inputStyle}
+                    onFocus={focusIn}
+                    onBlur={focusOut}
+                  />
+                </div>
+              ))}
+
+              <div>
+                <label className="block text-xs font-medium mb-2 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                  Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPw ? 'text' : 'password'}
+                    value={form.password}
+                    onChange={(e) => update('password', e.target.value)}
+                    placeholder="••••••••"
+                    autoComplete="new-password"
+                    className="w-full px-4 py-3 pr-11 rounded-xl text-sm outline-none transition-all duration-150"
+                    style={inputStyle}
+                    onFocus={focusIn}
+                    onBlur={focusOut}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPw(!showPw)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer"
+                    style={{ color: 'var(--text-ghost)' }}
+                  >
+                    {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                {form.password && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <div className="flex gap-1 flex-1">
+                      {[1, 2, 3, 4].map((i) => (
+                        <div
+                          key={i}
+                          className="h-0.5 flex-1 rounded-full transition-all duration-300"
+                          style={{ background: i <= pwStrength ? strengthColor : 'var(--border-color)' }}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-xs" style={{ color: strengthColor }}>{strengthLabel}</span>
+                  </div>
                 )}
               </div>
-            </div>
 
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition flex items-center justify-center gap-2 shadow-md mt-2"
-            >
-              {loading ? (
-                <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
-              ) : (
-                <UserPlus className="w-4 h-4" />
+              <div>
+                <label className="block text-xs font-medium mb-2 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                  Confirm Password
+                </label>
+                <input
+                  type="password"
+                  value={form.confirm}
+                  onChange={(e) => update('confirm', e.target.value)}
+                  placeholder="••••••••"
+                  autoComplete="new-password"
+                  className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all duration-150"
+                  style={{
+                    ...inputStyle,
+                    borderColor:
+                      form.confirm && form.password !== form.confirm
+                        ? 'rgba(224,85,85,0.4)'
+                        : form.confirm && form.password === form.confirm
+                        ? 'rgba(74,154,106,0.4)'
+                        : 'var(--border-color)',
+                  }}
+                  onFocus={focusIn}
+                  onBlur={focusOut}
+                />
+              </div>
+
+              {error && (
+                <p
+                  className="text-xs py-2 px-3 rounded-lg"
+                  style={{ color: '#e05555', background: 'rgba(224,85,85,0.08)', border: '1px solid rgba(224,85,85,0.2)' }}
+                >
+                  {error}
+                </p>
               )}
-              {loading ? 'Creating diary…' : 'Create My Diary'}
-            </button>
-          </form>
 
-          {/* Encryption notice */}
-          <div className="mt-5 p-3 bg-amber-50 rounded-xl border border-amber-200">
-            <p className="text-xs text-amber-700 text-center">
-              🔐 All diary entries are encrypted with AES-256. Even we cannot read your diary.
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all duration-150 mt-2 disabled:opacity-60 cursor-pointer shadow-sm"
+                style={{ background: 'linear-gradient(135deg, #c4913a, #dba84a)', color: '#0c0c17' }}
+              >
+                {loading ? (
+                  <span className="w-4 h-4 border-2 border-ink/30 border-t-ink rounded-full animate-spin" />
+                ) : (
+                  <>
+                    Create Account
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </form>
+
+            <p className="text-center text-sm mt-6" style={{ color: 'var(--text-muted)' }}>
+              Already have an account?{' '}
+              <Link to="/login" className="font-medium" style={{ color: 'var(--gold)' }}>
+                Sign in
+              </Link>
             </p>
           </div>
-
-          <p className="text-center text-sm text-stone-500 mt-5">
-            Already have a diary?{' '}
-            <Link to="/login" className="text-amber-600 hover:text-amber-700 font-medium">
-              Sign in
-            </Link>
-          </p>
         </div>
       </div>
     </div>

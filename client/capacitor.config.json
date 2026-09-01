@@ -1,0 +1,6 @@
+{
+  "appId": "com.personaldiary.app",
+  "appName": "Personal Diary",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}

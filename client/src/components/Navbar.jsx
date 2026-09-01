@@ -1,63 +1,121 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { BookOpen, Plus, LogOut, Lock, User } from 'lucide-react';
+import { BookOpen, Plus, LogOut, User, Sun, Moon, Lock, KeyRound } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useTheme } from '../context/ThemeContext.jsx';
+import SetPinModal from './SetPinModal.jsx';
 
 export default function Navbar() {
-  const { user, logout } = useAuth();
+  const { user, logout, lockApp, hasPin } = useAuth();
+  const { isDark, toggleTheme } = useTheme();
   const navigate = useNavigate();
+  const [showPinModal, setShowPinModal] = useState(false);
 
   const handleLogout = async () => {
     await logout();
-    toast.success('Goodbye! Diary locked 🔒');
+    toast.success('Goodbye!');
     navigate('/login');
   };
 
+  const handleLock = () => {
+    if (hasPin) {
+      lockApp();
+      toast.success('Diary locked 🔒');
+    } else {
+      setShowPinModal(true);
+    }
+  };
+
   return (
-    <nav className="bg-white border-b border-stone-100 shadow-sm sticky top-0 z-10">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
-        {/* Brand */}
-        <Link to="/dashboard" className="flex items-center gap-2 hover:opacity-80 transition">
-          <div className="w-7 h-7 sm:w-8 sm:h-8 bg-amber-500 rounded-lg flex items-center justify-center">
-            <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
-          </div>
-          <span className="font-bold text-stone-800 text-base sm:text-lg">My Diary</span>
-        </Link>
-
-        {/* Right side */}
-        <div className="flex items-center gap-2 sm:gap-3">
-          {/* Encryption badge */}
-          <span className="hidden md:flex items-center gap-1 text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
-            <Lock className="w-3 h-3" />
-            End-to-end encrypted
-          </span>
-
-          {/* New Entry */}
+    <>
+      <nav
+        className="sticky top-0 z-20 backdrop-blur-md transition-colors duration-200"
+        style={{
+          background: 'var(--nav-bg)',
+          borderBottom: '1px solid var(--border-color)',
+        }}
+      >
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
+          {/* Brand */}
           <Link
-            to="/entry/new"
-            className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs sm:text-sm font-medium px-2.5 py-1.5 sm:px-3 rounded-lg transition shadow-sm"
+            to="/dashboard"
+            className="flex items-center gap-2.5 group"
           >
-            <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            <span className="hidden sm:inline">New Entry</span>
+            <div
+              className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-200 group-hover:scale-105"
+              style={{ background: 'linear-gradient(135deg, #c4913a, #dba84a)' }}
+            >
+              <BookOpen className="w-3.5 h-3.5 text-[#0c0c17]" />
+            </div>
+            <span
+              className="font-display text-base font-semibold tracking-tight"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              My Diary
+            </span>
           </Link>
 
-          {/* User + Logout */}
-          <div className="flex items-center gap-1 sm:gap-2">
-            <div className="hidden sm:flex items-center gap-1.5 text-sm text-stone-500">
-              <User className="w-3.5 h-3.5" />
-              <span className="max-w-[100px] truncate">{user?.username}</span>
-            </div>
+          {/* Right */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5">
+            {/* Theme toggle */}
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-lg transition-all duration-150 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+              style={{ color: 'var(--text-muted)' }}
+              title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-amber-700" />}
+            </button>
+
+            {/* Lock Button */}
+            <button
+              onClick={handleLock}
+              className="p-2 rounded-lg transition-all duration-150 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+              style={{ color: 'var(--text-muted)' }}
+              title={hasPin ? 'Lock Diary' : 'Set PIN Lock'}
+            >
+              {hasPin ? <Lock className="w-4 h-4 text-amber-500" /> : <KeyRound className="w-4 h-4" />}
+            </button>
+
+            {/* New entry */}
+            <Link
+              to="/entry/new"
+              className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg transition-all duration-150 shadow-sm"
+              style={{
+                background: 'linear-gradient(135deg, #c4913a, #dba84a)',
+                color: '#0c0c17',
+              }}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">New Entry</span>
+            </Link>
+
+            {/* User chip */}
+            {user && (
+              <div
+                className="hidden sm:flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                <User className="w-3 h-3" />
+                <span className="max-w-[90px] truncate">{user.username}</span>
+              </div>
+            )}
+
+            {/* Logout */}
             <button
               onClick={handleLogout}
-              className="p-1.5 sm:p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
-              title="Logout"
+              className="p-1.5 rounded-lg transition-all duration-150 hover:bg-red-500/10 hover:text-red-500 cursor-pointer"
+              style={{ color: 'var(--text-ghost)' }}
+              title="Sign out"
             >
-              <LogOut className="w-4 h-4 sm:w-4 sm:h-4" />
+              <LogOut className="w-4 h-4" />
             </button>
           </div>
         </div>
-      </div>
-    </nav>
+      </nav>
+
+      <SetPinModal isOpen={showPinModal} onClose={() => setShowPinModal(false)} />
+    </>
   );
 }

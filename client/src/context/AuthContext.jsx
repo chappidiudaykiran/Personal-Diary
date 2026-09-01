@@ -1,26 +1,33 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import apiClient from '../api/apiClient';
-import { deriveKey } from '../crypto/cryptoUtils';
+import { deriveKey, encryptWithPin, decryptWithPin } from '../crypto/cryptoUtils';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [cryptoKey, setCryptoKey] = useState(null); // AES-GCM key — lives in memory only
+  const [cryptoKey, setCryptoKey] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isLocked, setIsLocked] = useState(false);
+  const [tempPassword, setTempPassword] = useState(null); // Used right after login to set a PIN seamlessly
+  const [showPinSetup, setShowPinSetup] = useState(false);
 
-  // On mount, restore user info from localStorage (but NOT the crypto key)
-  // The crypto key is NOT stored anywhere — user must re-derive it on login
+  // Restore user session and check if PIN locked
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
     const savedToken = localStorage.getItem('accessToken');
+    const pinVault = localStorage.getItem('diary_pin_vault');
+
     if (savedUser && savedToken) {
       setUser(JSON.parse(savedUser));
+      if (pinVault) {
+        setIsLocked(true);
+      }
     }
     setLoading(false);
   }, []);
 
-  // Listen for forced logout events (e.g., refresh token expired)
+  // Listen for forced logout events
   useEffect(() => {
     const handleForceLogout = () => logout();
     window.addEventListener('auth:logout', handleForceLogout);
@@ -28,14 +35,11 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   /**
-   * Register a new user.
-   * After registration the server returns encSalt, which we use immediately
-   * to derive the AES encryption key from the user's password.
+   * Register
    */
   const register = useCallback(async ({ username, email, password }) => {
     const { data } = await apiClient.post('/auth/register', { username, email, password });
 
-    // Derive encryption key in the browser — never sent to server
     const key = await deriveKey(password, data.user.encSalt);
 
     localStorage.setItem('accessToken', data.accessToken);
@@ -43,19 +47,20 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('user', JSON.stringify(data.user));
 
     setUser(data.user);
-    setCryptoKey(key); // store in memory only
+    setCryptoKey(key);
+    setIsLocked(false);
+    setTempPassword(password);
+    setShowPinSetup(true);
 
     return data;
   }, []);
 
   /**
-   * Login an existing user.
-   * Server returns encSalt, which we use to re-derive the AES key.
+   * Login
    */
   const login = useCallback(async ({ email, password }) => {
     const { data } = await apiClient.post('/auth/login', { email, password });
 
-    // Re-derive encryption key using the password + encSalt from server
     const key = await deriveKey(password, data.user.encSalt);
 
     localStorage.setItem('accessToken', data.accessToken);
@@ -63,13 +68,60 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('user', JSON.stringify(data.user));
 
     setUser(data.user);
-    setCryptoKey(key); // store in memory only
+    setCryptoKey(key);
+    setIsLocked(false);
+    setTempPassword(password);
+
+    const hasPinSet = Boolean(localStorage.getItem('diary_pin_vault'));
+    if (!hasPinSet) {
+      setShowPinSetup(true);
+    }
 
     return data;
   }, []);
 
   /**
-   * Logout: clear all tokens, user state, AND the crypto key from memory.
+   * Save / Set a 4-digit PIN
+   */
+  const setPin = useCallback(async (pin, rawPassword = tempPassword) => {
+    if (!rawPassword) {
+      throw new Error('Password required to configure PIN');
+    }
+    const encrypted = await encryptWithPin(pin, rawPassword);
+    localStorage.setItem('diary_pin_vault', JSON.stringify(encrypted));
+    setTempPassword(null);
+    setShowPinSetup(false);
+    return true;
+  }, [tempPassword]);
+
+  /**
+   * Unlock with 4-digit PIN
+   */
+  const unlockWithPin = useCallback(async (pin) => {
+    const vaultStr = localStorage.getItem('diary_pin_vault');
+    if (!vaultStr || !user) {
+      throw new Error('No PIN lock configured');
+    }
+
+    const vault = JSON.parse(vaultStr);
+    const password = await decryptWithPin(pin, vault.ciphertext, vault.salt, vault.iv);
+    const key = await deriveKey(password, user.encSalt);
+
+    setCryptoKey(key);
+    setIsLocked(false);
+    return true;
+  }, [user]);
+
+  /**
+   * Lock the app immediately
+   */
+  const lockApp = useCallback(() => {
+    setCryptoKey(null);
+    setIsLocked(true);
+  }, []);
+
+  /**
+   * Complete Logout
    */
   const logout = useCallback(async () => {
     try {
@@ -81,15 +133,38 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
+      localStorage.removeItem('diary_pin_vault');
       setUser(null);
-      setCryptoKey(null); // wipe key from memory
+      setCryptoKey(null);
+      setIsLocked(false);
+      setTempPassword(null);
+      setShowPinSetup(false);
     }
   }, []);
 
-  const isAuthenticated = !!user && !!cryptoKey;
+  const hasPin = Boolean(localStorage.getItem('diary_pin_vault'));
+  const isAuthenticated = !!user && !!cryptoKey && !isLocked;
 
   return (
-    <AuthContext.Provider value={{ user, cryptoKey, loading, isAuthenticated, login, register, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        cryptoKey,
+        loading,
+        isAuthenticated,
+        isLocked,
+        hasPin,
+        showPinSetup,
+        setShowPinSetup,
+        tempPassword,
+        login,
+        register,
+        logout,
+        setPin,
+        unlockWithPin,
+        lockApp,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

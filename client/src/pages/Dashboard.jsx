@@ -1,36 +1,53 @@
-import React, { useEffect, useState } from 'react';
-import { Plus, BookOpen, Search } from 'lucide-react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { Plus, BookOpen, Search, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar.jsx';
 import EntryCard from '../components/EntryCard.jsx';
 import apiClient from '../api/apiClient.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { decrypt } from '../crypto/cryptoUtils.js';
+import { MOODS } from '../components/MoodPicker.jsx';
+
+function formatGreeting(date) {
+  const h = date.getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function formatFullDate(date) {
+  return date.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
 
 export default function Dashboard() {
-  const { cryptoKey } = useAuth();
+  const { user, cryptoKey } = useAuth();
   const [entries, setEntries] = useState([]);
-  const [decryptedTitles, setDecryptedTitles] = useState({}); // { id: plaintext }
+  const [decryptedTitles, setDecryptedTitles] = useState({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState('');
+  const [moodFilter, setMoodFilter] = useState('');
 
-  // ─── Fetch entries ─────────────────────────────────────────────────────────
+  // ─── Fetch entries ────────────────────────────────────────────────────────
   useEffect(() => {
     const fetchEntries = async () => {
       try {
         const { data } = await apiClient.get('/entries');
-        setEntries(data.entries);
+        const list = data.entries || [];
+        setEntries(list);
 
-        // Decrypt all titles in parallel (titles are small, fast to decrypt)
         const titleMap = {};
         await Promise.all(
-          data.entries.map(async (entry) => {
+          list.map(async (entry) => {
             try {
               titleMap[entry._id] = await decrypt(cryptoKey, entry.encryptedTitle, entry.iv);
             } catch {
-              titleMap[entry._id] = '(Unable to decrypt)';
+              titleMap[entry._id] = 'Untitled Entry';
             }
           })
         );
@@ -46,78 +63,156 @@ export default function Dashboard() {
   }, [cryptoKey]);
 
   // ─── Filter entries ────────────────────────────────────────────────────────
-  const filtered = entries.filter((entry) => {
-    const titleMatch = !search ||
-      (decryptedTitles[entry._id] || '').toLowerCase().includes(search.toLowerCase());
-    const moodMatch = !filter || entry.mood === filter;
-    return titleMatch && moodMatch;
-  });
+  const filtered = useMemo(() => {
+    return entries.filter((entry) => {
+      const title = decryptedTitles[entry._id] || '';
+      const titleMatch = !search || title.toLowerCase().includes(search.toLowerCase());
+      const moodMatch = !moodFilter || entry.mood === moodFilter;
+      return titleMatch && moodMatch;
+    });
+  }, [entries, decryptedTitles, search, moodFilter]);
 
-  const moods = ['happy', 'excited', 'grateful', 'neutral', 'anxious', 'sad', 'angry'];
-  const moodEmoji = { happy: '😊', excited: '🤩', grateful: '🙏', neutral: '😐', anxious: '😰', sad: '😢', angry: '😠' };
+  const now = new Date();
+  const hasFilters = Boolean(search || moodFilter);
 
   return (
-    <div className="min-h-screen bg-amber-50">
+    <div className="min-h-screen transition-colors duration-200" style={{ background: 'var(--bg-app)' }}>
       <Navbar />
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 pt-8 pb-16">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-stone-800">My Diary</h1>
-            <p className="text-stone-400 text-sm mt-0.5">
-              {entries.length} {entries.length === 1 ? 'entry' : 'entries'} — all encrypted 🔐
-            </p>
+        <div
+          className="mb-10 pb-8 fade-up"
+          style={{ borderBottom: '1px solid var(--border-color)' }}
+        >
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+            <div>
+              <p className="text-xs uppercase tracking-widest mb-2 font-medium" style={{ color: 'var(--text-muted)' }}>
+                {formatFullDate(now)}
+              </p>
+              <h1
+                className="font-display text-3xl sm:text-4xl"
+                style={{ color: 'var(--text-primary)', fontWeight: 300 }}
+              >
+                {formatGreeting(now)},{' '}
+                <em className="not-italic" style={{ color: 'var(--gold)' }}>
+                  {user?.username || 'friend'}
+                </em>
+              </h1>
+              <p className="mt-2 text-sm" style={{ color: 'var(--text-muted)' }}>
+                {entries.length === 0
+                  ? 'Your diary is empty. Start writing.'
+                  : `${entries.length} ${entries.length === 1 ? 'entry' : 'entries'}`}
+              </p>
+            </div>
+
+            <Link
+              to="/entry/new"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 flex-shrink-0 self-start sm:self-auto shadow-sm"
+              style={{
+                background: 'linear-gradient(135deg, #c4913a, #dba84a)',
+                color: '#0c0c17',
+              }}
+            >
+              <Plus className="w-4 h-4" />
+              New Entry
+            </Link>
           </div>
-          <Link
-            to="/entry/new"
-            className="inline-flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold px-4 py-2.5 rounded-xl transition shadow-md w-full sm:w-auto"
-          >
-            <Plus className="w-4 h-4" />
-            New Entry
-          </Link>
         </div>
 
-        {/* Search + Mood Filter */}
+        {/* Search + Mood filter */}
         {entries.length > 0 && (
-          <div className="flex flex-col sm:flex-row flex-wrap gap-3 mb-6">
-            <div className="relative w-full sm:w-auto flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+          <div className="flex flex-col sm:flex-row gap-3 mb-8 fade-up" style={{ animationDelay: '0.05s' }}>
+            {/* Search */}
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-ghost)' }} />
               <input
                 type="text"
-                placeholder="Search entries…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white text-sm"
+                placeholder="Search entries…"
+                className="w-full pl-9 pr-9 py-2.5 rounded-xl text-sm outline-none transition-all duration-150"
+                style={{
+                  background: 'var(--bg-input)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--border-bright)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--border-color)';
+                }}
               />
+              {search && (
+                <button
+                  onClick={() => setSearch('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer"
+                  style={{ color: 'var(--text-ghost)' }}
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
-            <div className="flex gap-1.5 flex-wrap w-full sm:w-auto">
+
+            {/* Mood chips */}
+            <div className="flex items-center gap-1.5 flex-wrap">
               <button
-                onClick={() => setFilter('')}
-                className={`px-3 py-1.5 flex-1 sm:flex-none rounded-full text-sm transition border ${!filter ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-stone-500 border-stone-200 hover:border-amber-300'}`}
+                onClick={() => setMoodFilter('')}
+                className="px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-150 cursor-pointer"
+                style={
+                  !moodFilter
+                    ? { background: 'var(--gold-glow)', color: 'var(--gold)', border: '1px solid var(--border-bright)' }
+                    : { background: 'var(--bg-elevated)', color: 'var(--text-muted)', border: '1px solid var(--border-color)' }
+                }
               >
                 All
               </button>
-              {moods.map((m) => (
+              {MOODS.map((m) => (
                 <button
-                  key={m}
-                  onClick={() => setFilter(filter === m ? '' : m)}
-                  className={`px-3 py-1.5 flex-1 sm:flex-none rounded-full text-sm transition border flex justify-center ${filter === m ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-stone-500 border-stone-200 hover:border-amber-300'}`}
+                  key={m.value}
+                  onClick={() => setMoodFilter(moodFilter === m.value ? '' : m.value)}
+                  className="px-2.5 py-1.5 rounded-full text-sm transition-all duration-150 cursor-pointer"
+                  style={
+                    moodFilter === m.value
+                      ? { background: 'var(--gold-glow)', border: '1px solid var(--border-bright)' }
+                      : { background: 'var(--bg-elevated)', border: '1px solid var(--border-color)' }
+                  }
+                  title={m.label}
                 >
-                  {moodEmoji[m]}
+                  {m.emoji}
                 </button>
               ))}
             </div>
           </div>
         )}
 
-        {/* Loading */}
+        {/* Loading skeleton */}
         {loading && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div
+            className="grid gap-4 fade-up"
+            style={{
+              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+            }}
+          >
             {[...Array(6)].map((_, i) => (
-              <div key={i} className="bg-white rounded-2xl p-5 animate-pulse">
-                <div className="h-5 bg-stone-100 rounded w-3/4 mb-3" />
-                <div className="h-3 bg-stone-100 rounded w-1/2" />
+              <div
+                key={i}
+                className="h-44 rounded-2xl p-5 flex flex-col justify-between"
+                style={{
+                  background: 'var(--card-gradient)',
+                  border: '1px solid var(--border-color)',
+                }}
+              >
+                <div className="flex justify-between items-center">
+                  <div className="h-6 w-16 rounded skeleton" />
+                  <div className="h-6 w-6 rounded-full skeleton" />
+                </div>
+                <div className="space-y-2 my-auto">
+                  <div className="h-4 w-3/4 rounded skeleton" />
+                  <div className="h-3 w-1/2 rounded skeleton" />
+                </div>
+                <div className="h-3 w-1/3 rounded skeleton pt-2" />
               </div>
             ))}
           </div>
@@ -125,15 +220,23 @@ export default function Dashboard() {
 
         {/* Empty state */}
         {!loading && entries.length === 0 && (
-          <div className="text-center py-20 fade-in">
-            <div className="w-20 h-20 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <BookOpen className="w-10 h-10 text-amber-400" />
+          <div className="flex flex-col items-center justify-center py-28 fade-up">
+            <div
+              className="w-20 h-20 rounded-2xl flex items-center justify-center mb-6"
+              style={{ background: 'var(--gold-glow)', border: '1px solid var(--border-color)' }}
+            >
+              <BookOpen className="w-9 h-9" style={{ color: 'var(--gold)', opacity: 0.8 }} />
             </div>
-            <h2 className="text-xl font-semibold text-stone-600 mb-2">Your diary is empty</h2>
-            <p className="text-stone-400 mb-6 text-sm">Start writing your first encrypted entry</p>
+            <h2 className="font-display text-xl mb-2" style={{ color: 'var(--text-primary)', fontWeight: 400 }}>
+              Your diary awaits
+            </h2>
+            <p className="text-sm mb-8 text-center max-w-xs" style={{ color: 'var(--text-muted)' }}>
+              Write your first entry.
+            </p>
             <Link
               to="/entry/new"
-              className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold px-5 py-2.5 rounded-xl transition shadow-md"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold shadow-sm"
+              style={{ background: 'linear-gradient(135deg, #c4913a, #dba84a)', color: '#0c0c17' }}
             >
               <Plus className="w-4 h-4" />
               Write First Entry
@@ -143,24 +246,54 @@ export default function Dashboard() {
 
         {/* No results */}
         {!loading && entries.length > 0 && filtered.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-stone-400">No entries match your search.</p>
-            <button onClick={() => { setSearch(''); setFilter(''); }} className="text-amber-500 text-sm mt-2 hover:underline">
+          <div className="text-center py-16">
+            <p className="text-sm mb-3" style={{ color: 'var(--text-muted)' }}>No entries match your search.</p>
+            <button
+              onClick={() => { setSearch(''); setMoodFilter(''); }}
+              className="text-xs font-medium transition-colors cursor-pointer"
+              style={{ color: 'var(--gold)' }}
+            >
               Clear filters
+            </button>
+          </div>
+        )}
+
+        {/* Active filter summary */}
+        {!loading && hasFilters && filtered.length > 0 && (
+          <div className="flex items-center gap-2 mb-4 text-xs" style={{ color: 'var(--text-muted)' }}>
+            <span>{filtered.length} {filtered.length === 1 ? 'entry' : 'entries'} found</span>
+            <button
+              onClick={() => { setSearch(''); setMoodFilter(''); }}
+              className="flex items-center gap-1 transition-colors cursor-pointer"
+              style={{ color: 'var(--gold)' }}
+            >
+              <X className="w-3 h-3" />
+              Clear
             </button>
           </div>
         )}
 
         {/* Entry grid */}
         {!loading && filtered.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 fade-in">
-            {filtered.map((entry) => (
-              <EntryCard
+          <div
+            className="grid gap-4 fade-up"
+            style={{
+              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+              animationDelay: '0.1s',
+            }}
+          >
+            {filtered.map((entry, i) => (
+              <div
                 key={entry._id}
-                entry={entry}
-                decryptedTitle={decryptedTitles[entry._id]}
-                isDecrypting={!decryptedTitles[entry._id]}
-              />
+                className="fade-up"
+                style={{ animationDelay: `${0.05 * Math.min(i, 8)}s` }}
+              >
+                <EntryCard
+                  entry={entry}
+                  decryptedTitle={decryptedTitles[entry._id]}
+                  isDecrypting={!decryptedTitles[entry._id]}
+                />
+              </div>
             ))}
           </div>
         )}

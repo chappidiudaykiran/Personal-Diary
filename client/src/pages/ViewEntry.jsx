@@ -1,16 +1,27 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { format } from 'date-fns';
-import { ArrowLeft, Pencil, Trash2, Save, X, Hash, Lock } from 'lucide-react';
+import { ArrowLeft, Pencil, Trash2, Save, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar.jsx';
-import MoodPicker from '../components/MoodPicker.jsx';
+import MoodPicker, { moodMap } from '../components/MoodPicker.jsx';
 import apiClient from '../api/apiClient.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { encrypt, decrypt } from '../crypto/cryptoUtils.js';
-import { MOODS } from '../components/MoodPicker.jsx';
 
-const moodMap = Object.fromEntries(MOODS.map((m) => [m.value, m]));
+function formatDate(date) {
+  const d = date instanceof Date ? date : new Date(date);
+  return d.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+function formatTime(date) {
+  const d = date instanceof Date ? date : new Date(date);
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
 
 export default function ViewEntry() {
   const { id } = useParams();
@@ -21,11 +32,14 @@ export default function ViewEntry() {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [mood, setMood] = useState('');
+  const [initialTitle, setInitialTitle] = useState('');
+  const [initialContent, setInitialContent] = useState('');
+  const [initialMood, setInitialMood] = useState('');
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
 
   // ─── Load & decrypt entry ──────────────────────────────────────────────────
   useEffect(() => {
@@ -34,14 +48,16 @@ export default function ViewEntry() {
         const { data } = await apiClient.get(`/entries/${id}`);
         setEntry(data.entry);
         setMood(data.entry.mood || '');
+        setInitialMood(data.entry.mood || '');
 
-        // Decrypt in the browser — title uses iv, content uses ivContent
         const [decTitle, decContent] = await Promise.all([
           decrypt(cryptoKey, data.entry.encryptedTitle, data.entry.iv),
           decrypt(cryptoKey, data.entry.encryptedContent, data.entry.ivContent),
         ]);
         setTitle(decTitle);
         setContent(decContent);
+        setInitialTitle(decTitle);
+        setInitialContent(decContent);
       } catch (err) {
         toast.error('Failed to load entry');
         navigate('/dashboard');
@@ -51,7 +67,7 @@ export default function ViewEntry() {
     };
 
     if (cryptoKey) load();
-  }, [id, cryptoKey]);
+  }, [id, cryptoKey, navigate]);
 
   // ─── Save edited entry ─────────────────────────────────────────────────────
   const handleSave = async () => {
@@ -61,7 +77,6 @@ export default function ViewEntry() {
     }
     setSaving(true);
     try {
-      // Re-encrypt with fresh IVs on every save
       const { ciphertext: encryptedTitle, iv } = await encrypt(cryptoKey, title.trim());
       const { ciphertext: encryptedContent, iv: ivContent } = await encrypt(cryptoKey, content.trim());
       const wordCount = content.trim().split(/\s+/).length;
@@ -76,8 +91,11 @@ export default function ViewEntry() {
       });
 
       setEntry(data.entry);
+      setInitialTitle(title);
+      setInitialContent(content);
+      setInitialMood(mood);
       setEditing(false);
-      toast.success('Entry updated & encrypted 🔐');
+      toast.success('Entry updated ✨');
     } catch {
       toast.error('Failed to update entry');
     } finally {
@@ -98,18 +116,31 @@ export default function ViewEntry() {
     }
   };
 
+  const handleCancelEdit = () => {
+    setTitle(initialTitle);
+    setContent(initialContent);
+    setMood(initialMood);
+    setEditing(false);
+  };
+
   // ─── Loading skeleton ──────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="min-h-screen bg-amber-50">
+      <div className="min-h-screen transition-colors duration-200" style={{ background: 'var(--bg-app)' }}>
         <Navbar />
         <main className="max-w-3xl mx-auto px-4 py-8">
-          <div className="bg-white rounded-2xl p-8 animate-pulse space-y-4">
-            <div className="h-8 bg-stone-100 rounded w-2/3" />
-            <div className="h-3 bg-stone-100 rounded w-1/3" />
-            <div className="space-y-2 mt-6">
+          <div
+            className="rounded-2xl p-8 space-y-4 shadow-sm"
+            style={{
+              background: 'var(--panel-gradient)',
+              border: '1px solid var(--border-color)',
+            }}
+          >
+            <div className="h-8 rounded w-2/3 skeleton" />
+            <div className="h-3 rounded w-1/3 skeleton" />
+            <div className="space-y-3 mt-6">
               {[...Array(8)].map((_, i) => (
-                <div key={i} className={`h-4 bg-stone-100 rounded ${i % 3 === 2 ? 'w-3/4' : 'w-full'}`} />
+                <div key={i} className={`h-4 rounded skeleton ${i % 3 === 2 ? 'w-3/4' : 'w-full'}`} />
               ))}
             </div>
           </div>
@@ -119,67 +150,118 @@ export default function ViewEntry() {
   }
 
   const currentMood = moodMap[mood];
+  const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
+  const createdAtDate = entry ? new Date(entry.createdAt) : new Date();
 
   return (
-    <div className="min-h-screen bg-amber-50">
+    <div className="min-h-screen transition-colors duration-200" style={{ background: 'var(--bg-app)' }}>
       <Navbar />
 
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
         {/* Back */}
         <button
           onClick={() => navigate('/dashboard')}
-          className="inline-flex items-center gap-1.5 text-stone-400 hover:text-stone-600 text-sm mb-4 sm:mb-6 transition"
+          className="flex items-center gap-1.5 text-sm mb-8 transition-colors cursor-pointer"
+          style={{ color: 'var(--text-muted)' }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--gold)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
         >
           <ArrowLeft className="w-4 h-4" />
           Back to diary
         </button>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden fade-in">
+        <article
+          className="rounded-2xl overflow-hidden fade-up shadow-sm"
+          style={{
+            background: 'var(--panel-gradient)',
+            border: '1px solid var(--border-color)',
+          }}
+        >
+          {/* Gold top accent */}
+          <div
+            className="h-px"
+            style={{ background: 'linear-gradient(90deg, transparent, var(--gold), transparent)' }}
+          />
+
           {/* Header */}
-          <div className="p-4 sm:p-6 pb-3 sm:pb-4">
+          <div
+            className="px-6 sm:px-8 pt-6 pb-5"
+            style={{ borderBottom: '1px solid var(--border-color)' }}
+          >
+            {/* Date + badges */}
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+              <span className="text-xs uppercase tracking-widest font-medium" style={{ color: 'var(--text-muted)' }}>
+                {formatDate(createdAtDate)} · {formatTime(createdAtDate)}
+              </span>
+              {wordCount > 0 && !editing && (
+                <span className="text-xs" style={{ color: 'var(--text-ghost)' }}>
+                  · {wordCount} {wordCount === 1 ? 'word' : 'words'}
+                </span>
+              )}
+              {!editing && currentMood && (
+                <span
+                  className="flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full"
+                  style={{
+                    background: `${currentMood.color}15`,
+                    border: `1px solid ${currentMood.color}35`,
+                    color: currentMood.color,
+                  }}
+                >
+                  {currentMood.emoji} {currentMood.label}
+                </span>
+              )}
+            </div>
+
+            {/* Title */}
             {editing ? (
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 maxLength={200}
-                className="w-full text-xl sm:text-2xl font-bold text-stone-800 border-b-2 border-amber-300 outline-none bg-transparent pb-1"
+                className="w-full outline-none bg-transparent font-display text-2xl sm:text-3xl"
+                style={{
+                  color: 'var(--text-primary)',
+                  fontWeight: 400,
+                  borderBottom: '1px solid var(--border-bright)',
+                  paddingBottom: '4px',
+                }}
               />
             ) : (
-              <h1 className="text-xl sm:text-2xl font-bold text-stone-800">{title || 'Untitled Entry'}</h1>
+              <h1
+                className="font-display text-2xl sm:text-3xl leading-snug"
+                style={{ color: 'var(--text-primary)', fontWeight: 400 }}
+              >
+                {title || 'Untitled Entry'}
+              </h1>
             )}
-
-            {/* Meta */}
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-3 sm:mt-2">
-              <span className="text-[11px] sm:text-xs text-stone-400">
-                {entry && format(new Date(entry.createdAt), 'EEEE, MMM d, yyyy · h:mm a')}
-              </span>
-              {entry?.wordCount > 0 && (
-                <span className="text-[11px] sm:text-xs text-stone-400">{entry.wordCount} words</span>
-              )}
-              {currentMood && !editing && (
-                <span className="text-xs sm:text-sm">{currentMood.emoji} {currentMood.label}</span>
-              )}
-              <span className="flex items-center gap-1 text-[10px] sm:text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-                <Lock className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> Decrypted locally
-              </span>
-            </div>
           </div>
 
-          {/* Divider */}
-          <div className="border-t border-stone-100 mx-4 sm:mx-6" />
-
-          {/* Content */}
-          <div className="p-4 sm:p-6">
+          {/* Body */}
+          <div className="px-6 sm:px-8 py-8">
             {editing ? (
               <textarea
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 rows={16}
-                className="w-full text-stone-700 border border-stone-200 rounded-xl p-3 sm:p-4 outline-none focus:ring-2 focus:ring-amber-300 bg-stone-50 leading-relaxed text-sm sm:text-base"
+                className="w-full outline-none rounded-xl px-4 py-3 text-sm sm:text-base leading-[1.9]"
+                style={{
+                  background: 'var(--bg-input)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-body)',
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--border-bright)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--border-color)';
+                }}
               />
             ) : (
-              <div className="text-stone-700 leading-relaxed whitespace-pre-wrap text-sm sm:text-base">
+              <div
+                className="font-sans text-sm sm:text-base leading-[1.95] whitespace-pre-wrap"
+                style={{ color: 'var(--text-body)' }}
+              >
                 {content}
               </div>
             )}
@@ -187,65 +269,80 @@ export default function ViewEntry() {
 
           {/* Mood editor (edit mode) */}
           {editing && (
-            <div className="px-4 sm:px-6 pb-4">
-              <label className="flex items-center gap-1.5 text-sm font-medium text-stone-500 mb-2">
-                <Hash className="w-3.5 h-3.5" />
+            <div
+              className="px-6 sm:px-8 pb-5"
+              style={{ borderTop: '1px solid var(--border-color)' }}
+            >
+              <p className="text-xs uppercase tracking-widest font-medium mt-5 mb-3" style={{ color: 'var(--text-muted)' }}>
                 Mood
-              </label>
+              </p>
               <MoodPicker value={mood} onChange={setMood} />
             </div>
           )}
 
-          {/* Actions */}
-          <div className="border-t border-stone-100 p-4 sm:p-6 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-4 sm:gap-0">
+          {/* Footer actions */}
+          <div
+            className="px-6 sm:px-8 py-5 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-4"
+            style={{ borderTop: '1px solid var(--border-color)' }}
+          >
             {/* Delete */}
-            <div className="flex justify-center sm:justify-start">
-              {showDeleteConfirm ? (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs sm:text-sm text-red-600 font-medium">Delete?</span>
+            <div>
+              {showDelete ? (
+                <div className="flex items-center gap-3">
+                  <span className="text-sm" style={{ color: 'var(--text-muted)' }}>Delete this entry?</span>
                   <button
                     onClick={handleDelete}
                     disabled={deleting}
-                    className="text-xs sm:text-sm bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg transition"
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all cursor-pointer"
+                    style={{ background: 'rgba(224,85,85,0.15)', color: '#e05555', border: '1px solid rgba(224,85,85,0.3)' }}
                   >
                     {deleting ? 'Deleting…' : 'Yes, delete'}
                   </button>
                   <button
-                    onClick={() => setShowDeleteConfirm(false)}
-                    className="text-xs sm:text-sm text-stone-400 hover:text-stone-600 px-2 py-1.5 transition"
+                    onClick={() => setShowDelete(false)}
+                    className="text-xs cursor-pointer"
+                    style={{ color: 'var(--text-ghost)' }}
                   >
                     Cancel
                   </button>
                 </div>
               ) : (
                 <button
-                  onClick={() => setShowDeleteConfirm(true)}
-                  className="flex items-center justify-center gap-1.5 text-stone-400 hover:text-red-500 text-sm transition py-2 sm:py-0"
+                  onClick={() => setShowDelete(true)}
+                  className="flex items-center gap-1.5 text-sm transition-colors cursor-pointer"
+                  style={{ color: 'var(--text-ghost)' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = '#e05555'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-ghost)'; }}
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="w-3.5 h-3.5" />
                   Delete
                 </button>
               )}
             </div>
 
             {/* Edit / Save / Cancel */}
-            <div className="flex items-center justify-stretch sm:justify-end gap-2">
+            <div className="flex items-center gap-2">
               {editing ? (
                 <>
                   <button
-                    onClick={() => setEditing(false)}
-                    className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 text-stone-400 hover:text-stone-600 text-sm px-3 py-2 transition"
+                    onClick={handleCancelEdit}
+                    className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg transition-all cursor-pointer"
+                    style={{ color: 'var(--text-muted)' }}
                   >
-                    <X className="w-4 h-4" />
+                    <X className="w-3.5 h-3.5" />
                     Cancel
                   </button>
                   <button
                     onClick={handleSave}
-                    disabled={saving}
-                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white font-semibold px-4 py-2 rounded-xl transition shadow-md text-sm"
+                    disabled={saving || !title.trim() || !content.trim()}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 cursor-pointer shadow-sm"
+                    style={{
+                      background: 'linear-gradient(135deg, #c4913a, #dba84a)',
+                      color: '#0c0c17',
+                    }}
                   >
                     {saving ? (
-                      <span className="animate-spin w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full" />
+                      <span className="w-3.5 h-3.5 border-2 border-ink/30 border-t-ink rounded-full animate-spin" />
                     ) : (
                       <Save className="w-3.5 h-3.5" />
                     )}
@@ -255,7 +352,18 @@ export default function ViewEntry() {
               ) : (
                 <button
                   onClick={() => setEditing(true)}
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 border border-amber-300 text-amber-600 hover:bg-amber-50 font-medium px-4 py-2 rounded-xl transition text-sm"
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer"
+                  style={{
+                    background: 'var(--gold-glow)',
+                    border: '1px solid var(--border-bright)',
+                    color: 'var(--gold)',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(196,145,58,0.16)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'var(--gold-glow)';
+                  }}
                 >
                   <Pencil className="w-3.5 h-3.5" />
                   Edit
@@ -263,7 +371,7 @@ export default function ViewEntry() {
               )}
             </div>
           </div>
-        </div>
+        </article>
       </main>
     </div>
   );

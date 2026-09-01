@@ -1,39 +1,29 @@
 // ─── cryptoUtils.js ────────────────────────────────────────────────────────────
-// All encryption/decryption happens HERE — in the browser.
-// The server and database NEVER see plaintext diary content.
-//
+// All cryptographic operations run strictly on the client.
 // Algorithm: AES-256-GCM (authenticated encryption)
 // Key Derivation: PBKDF2 with SHA-256 (100,000 iterations)
 // ──────────────────────────────────────────────────────────────────────────────
 
 const PBKDF2_ITERATIONS = 100000;
 const KEY_LENGTH = 256; // bits
-const SALT_BYTES = 32;
 
 /**
  * Derive an AES-256-GCM CryptoKey from the user's password and a hex salt.
- * This key is used to encrypt/decrypt diary entries.
- * The key is NEVER sent to the server or stored anywhere.
- *
- * @param {string} password - The user's plain password
- * @param {string} saltHex  - The encSalt from the server (hex string)
- * @returns {Promise<CryptoKey>}
  */
 export async function deriveKey(password, saltHex) {
   if (!window?.crypto?.subtle) {
     throw new Error(
-      'Web Crypto API is not available on this connection. Please use HTTPS or localhost to ensure encryption works.'
+      'Web Crypto API is not available on this connection. Please use HTTPS or localhost.'
     );
   }
 
   if (!saltHex || typeof saltHex !== 'string') {
-    throw new Error('Encryption salt is missing or invalid.');
+    throw new Error('Salt is missing or invalid.');
   }
 
   const enc = new TextEncoder();
   const salt = hexToBytes(saltHex.trim());
 
-  // Import the raw password as a base key material
   const keyMaterial = await window.crypto.subtle.importKey(
     'raw',
     enc.encode(password),
@@ -42,7 +32,6 @@ export async function deriveKey(password, saltHex) {
     ['deriveKey']
   );
 
-  // Derive an AES-GCM key using PBKDF2
   const key = await window.crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
@@ -52,7 +41,7 @@ export async function deriveKey(password, saltHex) {
     },
     keyMaterial,
     { name: 'AES-GCM', length: KEY_LENGTH },
-    false, // not extractable — key cannot be exported or read
+    false,
     ['encrypt', 'decrypt']
   );
 
@@ -60,13 +49,7 @@ export async function deriveKey(password, saltHex) {
 }
 
 /**
- * Encrypt a plaintext string using the derived AES-256-GCM key.
- * A unique random IV is generated for every encryption call.
- *
- * @param {CryptoKey} key   - The AES-GCM key from deriveKey()
- * @param {string} plaintext - The diary content to encrypt
- * @returns {Promise<{ ciphertext: string, iv: string }>}
- *          Both values are base64-encoded strings safe for JSON/DB storage.
+ * Encrypt a plaintext string using AES-256-GCM.
  */
 export async function encrypt(key, plaintext) {
   if (!window?.crypto?.subtle) {
@@ -74,7 +57,7 @@ export async function encrypt(key, plaintext) {
   }
 
   const enc = new TextEncoder();
-  const iv = window.crypto.getRandomValues(new Uint8Array(12)); // 96-bit IV for AES-GCM
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
 
   const ciphertextBuffer = await window.crypto.subtle.encrypt(
     { name: 'AES-GCM', iv },
@@ -89,13 +72,7 @@ export async function encrypt(key, plaintext) {
 }
 
 /**
- * Decrypt a base64-encoded ciphertext using the derived AES-256-GCM key.
- * Authentication tag is verified automatically — any tampering will throw.
- *
- * @param {CryptoKey} key        - The AES-GCM key from deriveKey()
- * @param {string} ciphertext    - Base64 ciphertext
- * @param {string} iv            - Base64 IV
- * @returns {Promise<string>}    - The decrypted plaintext
+ * Decrypt a base64-encoded ciphertext using AES-256-GCM.
  */
 export async function decrypt(key, ciphertext, iv) {
   if (!window?.crypto?.subtle) {
@@ -111,6 +88,88 @@ export async function decrypt(key, ciphertext, iv) {
   );
 
   return dec.decode(plaintextBuffer);
+}
+
+// ─── PIN Storage Helpers ──────────────────────────────────────────────────────
+
+/**
+ * Encrypt data (e.g. password) with a 4-digit PIN for quick local unlock.
+ */
+export async function encryptWithPin(pin, plaintext) {
+  const enc = new TextEncoder();
+  const salt = window.crypto.getRandomValues(new Uint8Array(16));
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+
+  const pinKeyMaterial = await window.crypto.subtle.importKey(
+    'raw',
+    enc.encode(pin),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveKey']
+  );
+
+  const pinKey = await window.crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt,
+      iterations: 50000,
+      hash: 'SHA-256',
+    },
+    pinKeyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+
+  const encryptedBuffer = await window.crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    pinKey,
+    enc.encode(plaintext)
+  );
+
+  return {
+    ciphertext: bytesToBase64(new Uint8Array(encryptedBuffer)),
+    salt: bytesToBase64(salt),
+    iv: bytesToBase64(iv),
+  };
+}
+
+/**
+ * Decrypt data using the 4-digit PIN. Throws on incorrect PIN.
+ */
+export async function decryptWithPin(pin, ciphertext, saltBase64, ivBase64) {
+  const enc = new TextEncoder();
+  const salt = base64ToBytes(saltBase64);
+  const iv = base64ToBytes(ivBase64);
+
+  const pinKeyMaterial = await window.crypto.subtle.importKey(
+    'raw',
+    enc.encode(pin),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveKey']
+  );
+
+  const pinKey = await window.crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt,
+      iterations: 50000,
+      hash: 'SHA-256',
+    },
+    pinKeyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+
+  const decryptedBuffer = await window.crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv },
+    pinKey,
+    base64ToBytes(ciphertext)
+  );
+
+  return new TextDecoder().decode(decryptedBuffer);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
