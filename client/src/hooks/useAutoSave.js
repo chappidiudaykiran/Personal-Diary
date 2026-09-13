@@ -5,36 +5,74 @@ const DEFAULT_AUTOSAVE_PREF_KEY = 'diary_autosave_enabled';
 
 export function useAutoSave({ draftId = 'new_entry', data = {}, onRestore }) {
   const { user } = useAuth();
-  const userId = user?._id || 'guest';
+  const userId = user?.id || user?._id || 'guest';
   const storageKey = `diary_draft_${userId}_${draftId}`;
 
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(() => {
-    const saved = localStorage.getItem(DEFAULT_AUTOSAVE_PREF_KEY);
-    return saved !== null ? JSON.parse(saved) : true;
+    try {
+      const saved = localStorage.getItem(DEFAULT_AUTOSAVE_PREF_KEY);
+      return saved !== null ? JSON.parse(saved) : true;
+    } catch {
+      return true;
+    }
   });
 
   const [status, setStatus] = useState('idle'); // 'idle' | 'saving' | 'saved' | 'disabled' | 'restored'
   const [lastSavedAt, setLastSavedAt] = useState(null);
   const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
 
-  const initialCheckDoneRef = useRef(false);
-  const isFirstRender = useRef(true);
+  const isInitializedRef = useRef(false);
+  const dataRef = useRef(data);
+  dataRef.current = data;
 
   // Toggle auto-save setting
   const toggleAutoSave = useCallback(() => {
     setAutoSaveEnabled((prev) => {
       const next = !prev;
-      localStorage.setItem(DEFAULT_AUTOSAVE_PREF_KEY, JSON.stringify(next));
+      try {
+        localStorage.setItem(DEFAULT_AUTOSAVE_PREF_KEY, JSON.stringify(next));
+      } catch (_) {}
       if (!next) setStatus('disabled');
       return next;
     });
   }, []);
 
-  // Check and restore existing draft on initial load
-  useEffect(() => {
-    if (initialCheckDoneRef.current) return;
-    initialCheckDoneRef.current = true;
+  // Clear draft from storage
+  const clearDraft = useCallback(() => {
+    try {
+      localStorage.removeItem(storageKey);
+      setStatus('idle');
+      setLastSavedAt(null);
+      setHasRestoredDraft(false);
+    } catch (e) {
+      console.error('Failed to clear draft', e);
+    }
+  }, [storageKey]);
 
+  // Synchronous save helper
+  const saveNow = useCallback((currentData) => {
+    const { title, content, mood } = currentData || dataRef.current || {};
+    const hasData = Boolean(title?.trim() || content?.trim() || mood);
+    if (!hasData) return;
+
+    try {
+      const now = new Date();
+      const draftObj = {
+        title: title || '',
+        content: content || '',
+        mood: mood || '',
+        savedAt: now.toISOString(),
+      };
+      localStorage.setItem(storageKey, JSON.stringify(draftObj));
+      setLastSavedAt(now);
+      setStatus('saved');
+    } catch (e) {
+      console.error('Failed to save draft', e);
+    }
+  }, [storageKey]);
+
+  // 1. Initial check and restore existing draft on mount
+  useEffect(() => {
     try {
       const stored = localStorage.getItem(storageKey);
       if (stored) {
@@ -50,27 +88,17 @@ export function useAutoSave({ draftId = 'new_entry', data = {}, onRestore }) {
       }
     } catch (e) {
       console.error('Failed to load auto-saved draft', e);
+    } finally {
+      // Mark initialization complete after restoration callback has fired
+      setTimeout(() => {
+        isInitializedRef.current = true;
+      }, 150);
     }
-  }, [storageKey, onRestore]);
+  }, [storageKey]); // Run on mount / storageKey change
 
-  // Clear draft from storage
-  const clearDraft = useCallback(() => {
-    try {
-      localStorage.removeItem(storageKey);
-      setStatus('idle');
-      setLastSavedAt(null);
-      setHasRestoredDraft(false);
-    } catch (e) {
-      console.error('Failed to clear draft', e);
-    }
-  }, [storageKey]);
-
-  // Debounced auto-save effect
+  // 2. Debounced auto-save effect when data changes
   useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
+    if (!isInitializedRef.current) return;
 
     if (!autoSaveEnabled) {
       setStatus('disabled');
@@ -81,32 +109,35 @@ export function useAutoSave({ draftId = 'new_entry', data = {}, onRestore }) {
     const hasData = Boolean(title?.trim() || content?.trim() || mood);
 
     if (!hasData) {
-      clearDraft();
       return;
     }
 
     setStatus('saving');
 
     const timer = setTimeout(() => {
-      try {
-        const now = new Date();
-        const draftObj = {
-          title: title || '',
-          content: content || '',
-          mood: mood || '',
-          savedAt: now.toISOString(),
-        };
-        localStorage.setItem(storageKey, JSON.stringify(draftObj));
-        setLastSavedAt(now);
-        setStatus('saved');
-      } catch (e) {
-        console.error('Failed to auto-save draft', e);
-        setStatus('idle');
-      }
-    }, 1000);
+      saveNow(data);
+    }, 400); // 400ms fast debounce
 
     return () => clearTimeout(timer);
-  }, [data.title, data.content, data.mood, autoSaveEnabled, storageKey, clearDraft]);
+  }, [data.title, data.content, data.mood, autoSaveEnabled, saveNow]);
+
+  // 3. Save draft immediately on window unload (closing tab or refreshing) or unmount
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (autoSaveEnabled && isInitializedRef.current) {
+        saveNow(dataRef.current);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      if (autoSaveEnabled && isInitializedRef.current) {
+        saveNow(dataRef.current);
+      }
+    };
+  }, [autoSaveEnabled, saveNow]);
 
   return {
     autoSaveEnabled,
@@ -116,5 +147,6 @@ export function useAutoSave({ draftId = 'new_entry', data = {}, onRestore }) {
     hasRestoredDraft,
     clearDraft,
     setHasRestoredDraft,
+    saveNow,
   };
 }

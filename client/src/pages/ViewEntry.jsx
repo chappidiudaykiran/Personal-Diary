@@ -87,7 +87,11 @@ export default function ViewEntry() {
       }
     };
 
-    if (cryptoKey) load();
+    if (cryptoKey) {
+      load();
+    } else {
+      setLoading(false);
+    }
   }, [id, cryptoKey, navigate]);
 
   // ─── Save edited entry ─────────────────────────────────────────────────────

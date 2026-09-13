@@ -14,7 +14,8 @@ router.get('/', async (req, res) => {
   try {
     const entries = await Entry.find({ userId: req.user._id })
       .select('encryptedTitle iv ivContent mood wordCount createdAt updatedAt')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     res.json({ entries });
   } catch (error) {
@@ -33,7 +34,7 @@ router.get(
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
     try {
-      const entry = await Entry.findOne({ _id: req.params.id, userId: req.user._id });
+      const entry = await Entry.findOne({ _id: req.params.id, userId: req.user._id }).lean();
       if (!entry) {
         return res.status(404).json({ message: 'Entry not found' });
       }

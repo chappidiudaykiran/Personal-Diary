@@ -33,33 +33,74 @@ export default function Dashboard() {
   const [search, setSearch] = useState('');
   const [moodFilter, setMoodFilter] = useState('');
 
-  // ─── Fetch entries ────────────────────────────────────────────────────────
+  // ─── Fetch & decrypt entries with caching and fast rendering ───────────────
   useEffect(() => {
+    let isMounted = true;
+
     const fetchEntries = async () => {
       try {
+        setLoading(true);
         const { data } = await apiClient.get('/entries');
         const list = data.entries || [];
-        setEntries(list);
 
-        const titleMap = {};
-        await Promise.all(
-          list.map(async (entry) => {
-            try {
-              titleMap[entry._id] = await decrypt(cryptoKey, entry.encryptedTitle, entry.iv);
-            } catch {
-              titleMap[entry._id] = 'Untitled Entry';
-            }
-          })
-        );
-        setDecryptedTitles(titleMap);
-      } catch (err) {
-        toast.error('Failed to load entries');
-      } finally {
+        if (!isMounted) return;
+        setEntries(list);
+        
+        // Stop skeleton loader immediately once entries list is fetched
         setLoading(false);
+
+        // Load cached titles and decrypt missing titles asynchronously
+        const titleMap = {};
+        const decryptions = [];
+
+        for (const entry of list) {
+          const cacheKey = `dec_title_${entry._id}_${entry.updatedAt}`;
+          const cached = sessionStorage.getItem(cacheKey);
+
+          if (cached) {
+            titleMap[entry._id] = cached;
+          } else if (cryptoKey) {
+            decryptions.push(
+              decrypt(cryptoKey, entry.encryptedTitle, entry.iv)
+                .then((decrypted) => {
+                  try {
+                    sessionStorage.setItem(cacheKey, decrypted);
+                  } catch (_) {}
+                  if (isMounted) {
+                    setDecryptedTitles((prev) => ({ ...prev, [entry._id]: decrypted }));
+                  }
+                })
+                .catch(() => {
+                  if (isMounted) {
+                    setDecryptedTitles((prev) => ({ ...prev, [entry._id]: 'Untitled Entry' }));
+                  }
+                })
+            );
+          }
+        }
+
+        if (isMounted) {
+          setDecryptedTitles((prev) => ({ ...prev, ...titleMap }));
+        }
+
+        await Promise.all(decryptions);
+      } catch (err) {
+        console.error('Fetch entries error:', err);
+        if (isMounted) toast.error('Failed to load entries');
+      } finally {
+        if (isMounted) setLoading(false);
       }
     };
 
-    if (cryptoKey) fetchEntries();
+    if (cryptoKey) {
+      fetchEntries();
+    } else {
+      setLoading(false);
+    }
+
+    return () => {
+      isMounted = false;
+    };
   }, [cryptoKey]);
 
   // ─── Filter entries ────────────────────────────────────────────────────────
@@ -100,7 +141,9 @@ export default function Dashboard() {
                 </em>
               </h1>
               <p className="mt-2 text-sm" style={{ color: 'var(--text-muted)' }}>
-                {entries.length === 0
+                {loading
+                  ? 'Loading your diary entries…'
+                  : entries.length === 0
                   ? 'Your diary is empty. Start writing.'
                   : `${entries.length} ${entries.length === 1 ? 'entry' : 'entries'}`}
               </p>
