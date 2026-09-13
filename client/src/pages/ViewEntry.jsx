@@ -1,12 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Pencil, Trash2, Save, X } from 'lucide-react';
+import { ArrowLeft, Pencil, Trash2, Save, X, Cloud, CloudOff, CheckCircle2, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar.jsx';
 import MoodPicker, { moodMap } from '../components/MoodPicker.jsx';
 import apiClient from '../api/apiClient.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { encrypt, decrypt } from '../crypto/cryptoUtils.js';
+import { useAutoSave } from '../hooks/useAutoSave.js';
 
 function formatDate(date) {
   const d = date instanceof Date ? date : new Date(date);
@@ -40,6 +41,26 @@ export default function ViewEntry() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
+
+  // Restore edit draft callback
+  const handleRestoreEditDraft = useCallback((draft) => {
+    if (draft.title) setTitle(draft.title);
+    if (draft.content) setContent(draft.content);
+    if (draft.mood) setMood(draft.mood);
+  }, []);
+
+  // Auto-save hook for editing existing entry
+  const {
+    autoSaveEnabled,
+    toggleAutoSave,
+    status: autoSaveStatus,
+    lastSavedAt,
+    clearDraft: clearEditDraft,
+  } = useAutoSave({
+    draftId: `edit_entry_${id}`,
+    data: editing ? { title, content, mood } : {},
+    onRestore: handleRestoreEditDraft,
+  });
 
   // ─── Load & decrypt entry ──────────────────────────────────────────────────
   useEffect(() => {
@@ -95,6 +116,7 @@ export default function ViewEntry() {
       setInitialContent(content);
       setInitialMood(mood);
       setEditing(false);
+      clearEditDraft();
       toast.success('Entry updated ✨');
     } catch {
       toast.error('Failed to update entry');
@@ -108,6 +130,7 @@ export default function ViewEntry() {
     setDeleting(true);
     try {
       await apiClient.delete(`/entries/${id}`);
+      clearEditDraft();
       toast.success('Entry deleted');
       navigate('/dashboard');
     } catch {
@@ -121,6 +144,7 @@ export default function ViewEntry() {
     setContent(initialContent);
     setMood(initialMood);
     setEditing(false);
+    clearEditDraft();
   };
 
   // ─── Loading skeleton ──────────────────────────────────────────────────────
@@ -188,27 +212,70 @@ export default function ViewEntry() {
             className="px-6 sm:px-8 pt-6 pb-5"
             style={{ borderBottom: '1px solid var(--border-color)' }}
           >
-            {/* Date + badges */}
-            <div className="flex flex-wrap items-center gap-2 mb-4">
-              <span className="text-xs uppercase tracking-widest font-medium" style={{ color: 'var(--text-muted)' }}>
-                {formatDate(createdAtDate)} · {formatTime(createdAtDate)}
-              </span>
-              {wordCount > 0 && !editing && (
-                <span className="text-xs" style={{ color: 'var(--text-ghost)' }}>
-                  · {wordCount} {wordCount === 1 ? 'word' : 'words'}
+            {/* Date + badges + AutoSave control if editing */}
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs uppercase tracking-widest font-medium" style={{ color: 'var(--text-muted)' }}>
+                  {formatDate(createdAtDate)} · {formatTime(createdAtDate)}
                 </span>
-              )}
-              {!editing && currentMood && (
-                <span
-                  className="flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full"
+                {wordCount > 0 && !editing && (
+                  <span className="text-xs" style={{ color: 'var(--text-ghost)' }}>
+                    · {wordCount} {wordCount === 1 ? 'word' : 'words'}
+                  </span>
+                )}
+                {!editing && currentMood && (
+                  <span
+                    className="flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full"
+                    style={{
+                      background: `${currentMood.color}15`,
+                      border: `1px solid ${currentMood.color}35`,
+                      color: currentMood.color,
+                    }}
+                  >
+                    {currentMood.emoji} {currentMood.label}
+                  </span>
+                )}
+              </div>
+
+              {editing && (
+                <button
+                  type="button"
+                  onClick={toggleAutoSave}
+                  title={autoSaveEnabled ? "Click to disable auto-save" : "Click to enable auto-save"}
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer"
                   style={{
-                    background: `${currentMood.color}15`,
-                    border: `1px solid ${currentMood.color}35`,
-                    color: currentMood.color,
+                    background: autoSaveEnabled ? 'rgba(196, 145, 58, 0.12)' : 'var(--bg-elevated)',
+                    border: '1px solid var(--border-color)',
+                    color: autoSaveEnabled ? 'var(--gold)' : 'var(--text-muted)',
                   }}
                 >
-                  {currentMood.emoji} {currentMood.label}
-                </span>
+                  {autoSaveStatus === 'saving' ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Saving draft...</span>
+                    </>
+                  ) : autoSaveStatus === 'saved' || autoSaveStatus === 'restored' ? (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>
+                        Auto-saved{' '}
+                        {lastSavedAt
+                          ? lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                          : ''}
+                      </span>
+                    </>
+                  ) : !autoSaveEnabled ? (
+                    <>
+                      <CloudOff className="w-3.5 h-3.5" />
+                      <span>Auto-save Off</span>
+                    </>
+                  ) : (
+                    <>
+                      <Cloud className="w-3.5 h-3.5" />
+                      <span>Auto-save On</span>
+                    </>
+                  )}
+                </button>
               )}
             </div>
 
