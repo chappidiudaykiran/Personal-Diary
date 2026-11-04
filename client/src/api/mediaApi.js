@@ -78,6 +78,11 @@ export async function listMedia(entryId) {
   return data.media || [];
 }
 
+export async function getMediaMeta(mediaId) {
+  const { data } = await apiClient.get(`/media/${mediaId}`);
+  return data.media;
+}
+
 /** Decrypt filename/MIME from metadata without downloading the file itself. */
 export async function decryptMediaMeta(cryptoKey, media) {
   const [name, mime] = await Promise.all([

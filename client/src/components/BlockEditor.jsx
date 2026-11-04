@@ -1,0 +1,345 @@
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  ImagePlus,
+  Type,
+  X,
+  ChevronUp,
+  ChevronDown,
+  FileText,
+  FileAudio,
+  FileVideo,
+  Lock,
+} from 'lucide-react';
+import toast from 'react-hot-toast';
+import {
+  MEDIA_ACCEPT,
+  MAX_FILE_BYTES,
+  MAX_FILES_PER_ENTRY,
+  isSupportedFile,
+  kindFromMime,
+  formatFileSize,
+} from '../api/mediaApi.js';
+import { InlineMedia } from './InlineMedia.jsx';
+import { createTextBlock, createMediaBlock } from '../utils/entryBlocks.js';
+
+function AutoTextarea({ blockKey, value, onChange, onCursor, placeholder, disabled, first }) {
+  const ref = useRef(null);
+
+  // Grow with content so the writing area never has its own inner scrollbar
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.max(el.scrollHeight, first ? 72 : 36)}px`;
+  }, [value, first]);
+
+  const trackCursor = (e) => onCursor(blockKey, e.target.selectionStart ?? value.length);
+
+  return (
+    <textarea
+      ref={ref}
+      data-block-key={blockKey}
+      value={value}
+      disabled={disabled}
+      onChange={(e) => {
+        onChange(e.target.value);
+        trackCursor(e);
+      }}
+      onFocus={trackCursor}
+      onSelect={trackCursor}
+      onClick={trackCursor}
+      onKeyUp={trackCursor}
+      placeholder={placeholder}
+      rows={1}
+      className="w-full outline-none bg-transparent text-sm sm:text-base leading-[1.9] font-sans py-1"
+      style={{ color: 'var(--text-body)', minHeight: first ? '4.5rem' : '2.25rem' }}
+    />
+  );
+}
+
+function PendingMediaPreview({ file }) {
+  const [url, setUrl] = useState(null);
+  const kind = kindFromMime(file.type, file.name);
+
+  useEffect(() => {
+    if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
+      const objectUrl = URL.createObjectURL(file);
+      setUrl(objectUrl);
+      return () => URL.revokeObjectURL(objectUrl);
+    }
+    setUrl(null);
+  }, [file]);
+
+  if (kind === 'image' && url) {
+    return <img src={url} alt={file.name} className="w-full max-h-[50vh] object-contain rounded-xl" style={{ background: 'var(--bg-elevated)' }} />;
+  }
+  if (kind === 'video' && url) {
+    return <video src={url} controls playsInline className="w-full max-h-[50vh] rounded-xl" style={{ background: '#000' }} />;
+  }
+  return (
+    <div
+      className="flex items-center gap-3 rounded-xl px-3 py-3"
+      style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)' }}
+    >
+      {kind === 'audio' ? (
+        <FileAudio className="w-5 h-5 flex-shrink-0" style={{ color: 'var(--gold)' }} />
+      ) : kind === 'video' ? (
+        <FileVideo className="w-5 h-5 flex-shrink-0" style={{ color: 'var(--gold)' }} />
+      ) : (
+        <FileText className="w-5 h-5 flex-shrink-0" style={{ color: 'var(--gold)' }} />
+      )}
+      <span className="text-xs truncate flex-1" style={{ color: 'var(--text-muted)' }}>
+        {file.name} · {formatFileSize(file.size)}
+      </span>
+      <span className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--text-ghost)' }}>Not saved yet</span>
+    </div>
+  );
+}
+
+/**
+ * Block editor: write text, tap "Media" and the file is inserted exactly
+ * where the cursor is (splitting the paragraph), then keep writing below it.
+ */
+export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = false }) {
+  const fileInputRef = useRef(null);
+  const activeRef = useRef({ key: null, cursor: 0 });
+  const focusKeyRef = useRef(null);
+  const [, setFocusTick] = useState(0);
+
+  const mediaCount = blocks.filter((b) => b.type === 'media').length;
+
+  // Focus a text block after an insert/split
+  useEffect(() => {
+    if (!focusKeyRef.current) return;
+    const el = document.querySelector(`textarea[data-block-key="${focusKeyRef.current}"]`);
+    if (el) {
+      el.focus();
+      el.setSelectionRange(0, 0);
+      focusKeyRef.current = null;
+    }
+  }, [blocks]);
+
+  const handleCursor = (key, cursor) => {
+    activeRef.current = { key, cursor };
+  };
+
+  const focusBlock = (key) => {
+    focusKeyRef.current = key;
+    setFocusTick((n) => n + 1);
+  };
+
+  const insertFiles = (fileList) => {
+    const incoming = Array.from(fileList || []);
+    if (incoming.length === 0) return;
+
+    const accepted = [];
+    for (const file of incoming) {
+      if (!isSupportedFile(file)) {
+        toast.error(`"${file.name}" is not a supported file type`);
+      } else if (file.size > MAX_FILE_BYTES) {
+        toast.error(`"${file.name}" is too large (max ${formatFileSize(MAX_FILE_BYTES)})`);
+      } else {
+        accepted.push(file);
+      }
+    }
+    if (accepted.length === 0) return;
+
+    const room = MAX_FILES_PER_ENTRY - mediaCount;
+    if (room <= 0) {
+      toast.error(`Maximum ${MAX_FILES_PER_ENTRY} files per entry`);
+      return;
+    }
+    const toInsert = accepted.slice(0, room);
+    if (toInsert.length < accepted.length) {
+      toast.error(`Only ${room} more file${room === 1 ? '' : 's'} can be added`);
+    }
+
+    // Find where to insert: the text block the cursor is in, else the last text block
+    let index = blocks.findIndex((b) => b.key === activeRef.current.key && b.type === 'text');
+    let cursor = activeRef.current.cursor;
+    if (index === -1) {
+      index = blocks.map((b) => b.type).lastIndexOf('text');
+      if (index === -1) {
+        const textBlock = createTextBlock('');
+        index = blocks.length;
+        cursor = 0;
+        blocks = [...blocks, textBlock];
+      } else {
+        cursor = blocks[index].text.length;
+      }
+    }
+
+    const target = blocks[index];
+    const before = createTextBlock(target.text.slice(0, cursor));
+    before.key = target.key; // keep identity/focus stable
+    const after = createTextBlock(target.text.slice(cursor));
+    const mediaBlocks = toInsert.map((file) => createMediaBlock({ file }));
+
+    const next = [
+      ...blocks.slice(0, index),
+      before,
+      ...mediaBlocks,
+      after,
+      ...blocks.slice(index + 1),
+    ];
+    onChange(next);
+    focusBlock(after.key);
+  };
+
+  const insertTextBlock = () => {
+    let index = blocks.findIndex((b) => b.key === activeRef.current.key);
+    if (index === -1) index = blocks.length - 1;
+    const textBlock = createTextBlock('');
+    const next = [...blocks.slice(0, index + 1), textBlock, ...blocks.slice(index + 1)];
+    onChange(next);
+    focusBlock(textBlock.key);
+  };
+
+  const removeBlock = (index) => {
+    const next = [...blocks];
+    next.splice(index, 1);
+    // Merge text blocks that became neighbours after removing media between them
+    for (let i = 0; i < next.length - 1; i++) {
+      if (next[i].type === 'text' && next[i + 1].type === 'text') {
+        next[i] = { ...next[i], text: `${next[i].text}${next[i + 1].text}` };
+        next.splice(i + 1, 1);
+        i--;
+      }
+    }
+    if (next.length === 0) next.push(createTextBlock(''));
+    onChange(next);
+  };
+
+  const moveBlock = (index, direction) => {
+    const target = index + direction;
+    if (target < 0 || target >= blocks.length) return;
+    const next = [...blocks];
+    [next[index], next[target]] = [next[target], next[index]];
+    onChange(next);
+  };
+
+  return (
+    <div className="flex flex-col min-h-full">
+      <div className="flex-1">
+        {blocks.map((block, index) => {
+          if (block.type === 'text') {
+            return (
+              <AutoTextarea
+                key={block.key}
+                blockKey={block.key}
+                value={block.text}
+                disabled={disabled}
+                first={index === 0}
+                placeholder={index === 0 ? 'Write freely. This is your safe space.' : 'Continue writing…'}
+                onCursor={handleCursor}
+                onChange={(text) => {
+                  const next = [...blocks];
+                  next[index] = { ...block, text };
+                  onChange(next);
+                }}
+              />
+            );
+          }
+
+          // Media block (saved or pending)
+          return (
+            <div key={block.key} className="relative group my-2">
+              {block.file ? (
+                <PendingMediaPreview file={block.file} />
+              ) : block.mediaId ? (
+                <InlineMedia cryptoKey={cryptoKey} mediaId={block.mediaId} />
+              ) : null}
+
+              {!disabled && (
+                <div className="absolute top-2 right-2 flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => moveBlock(index, -1)}
+                    disabled={index === 0}
+                    className="w-7 h-7 rounded-full flex items-center justify-center cursor-pointer disabled:opacity-30"
+                    style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}
+                    aria-label="Move up"
+                  >
+                    <ChevronUp className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => moveBlock(index, 1)}
+                    disabled={index === blocks.length - 1}
+                    className="w-7 h-7 rounded-full flex items-center justify-center cursor-pointer disabled:opacity-30"
+                    style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}
+                    aria-label="Move down"
+                  >
+                    <ChevronDown className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeBlock(index)}
+                    className="w-7 h-7 rounded-full flex items-center justify-center cursor-pointer"
+                    style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}
+                    aria-label="Remove attachment"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Insert toolbar — sticks to the bottom of the writing area */}
+      <div
+        className="sticky bottom-0 mt-3 flex items-center gap-2 rounded-xl px-2 py-2"
+        style={{
+          background: 'var(--bg-elevated)',
+          border: '1px solid var(--border-color)',
+          boxShadow: '0 -4px 16px rgba(0,0,0,0.12)',
+        }}
+      >
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => fileInputRef.current?.click()}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-50"
+          style={{ background: 'linear-gradient(135deg, #c4913a, #dba84a)', color: '#0c0c17' }}
+        >
+          <ImagePlus className="w-4 h-4" />
+          Media
+        </button>
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={insertTextBlock}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium cursor-pointer disabled:opacity-50"
+          style={{ background: 'var(--bg-raised)', border: '1px solid var(--border-color)', color: 'var(--text-muted)' }}
+        >
+          <Type className="w-4 h-4" />
+          Text
+        </button>
+        <span className="hidden sm:flex items-center gap-1 text-[11px] ml-1" style={{ color: 'var(--text-ghost)' }}>
+          <Lock className="w-3 h-3" />
+          Media is inserted at your cursor &amp; encrypted
+        </span>
+        <span className="sm:hidden text-[11px] ml-1" style={{ color: 'var(--text-ghost)' }}>
+          Inserts at cursor
+        </span>
+        <span className="text-[11px] ml-auto flex-shrink-0" style={{ color: 'var(--text-ghost)' }}>
+          {mediaCount}/{MAX_FILES_PER_ENTRY}
+        </span>
+      </div>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept={MEDIA_ACCEPT}
+        className="hidden"
+        onChange={(e) => {
+          insertFiles(e.target.files);
+          e.target.value = '';
+        }}
+      />
+    </div>
+  );
+}

@@ -156,7 +156,7 @@ You'll see something like:
 ## ✨ Features
 
 - 📝 Write, edit, delete diary entries
-- 📸 Attach photos, videos, audio & documents (up to 10 files/entry, 10 MB each) — gallery with lightbox, in-browser decrypted previews, download & delete
+- 📸 Inline photos, videos, audio & documents — insert media at your cursor between paragraphs (write → photo → write…), up to 10 files/entry, 10 MB each, decrypted in-browser for preview/playback/download
 - 🔐 AES-256-GCM encryption (browser-side, zero-knowledge) — media files, filenames, and file types are encrypted before upload and stored as ciphertext in MongoDB; the server never sees them
 - 😊 Mood tracking (Happy, Sad, Excited, Grateful, etc.)
 - 🔍 Search entries by title

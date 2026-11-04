@@ -1,16 +1,25 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Pencil, Trash2, Save, X, Cloud, CloudOff, CheckCircle2, Loader2 } from 'lucide-react';
+import { ArrowLeft, Pencil, Trash2, Save, X, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar.jsx';
 import MoodPicker, { moodMap } from '../components/MoodPicker.jsx';
-import MediaPicker from '../components/MediaPicker.jsx';
-import MediaGallery from '../components/MediaGallery.jsx';
-import { uploadMediaFile } from '../api/mediaApi.js';
+import BlockEditor from '../components/BlockEditor.jsx';
+import EntryContent from '../components/InlineMedia.jsx';
+import { uploadMediaFile, listMedia, deleteMedia } from '../api/mediaApi.js';
 import apiClient from '../api/apiClient.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { encrypt, decrypt } from '../crypto/cryptoUtils.js';
-import { useAutoSave } from '../hooks/useAutoSave.js';
+import {
+  parseEntryContent,
+  serializeBlocks,
+  countBlockWords,
+  hasBlockContent,
+  referencedMediaIds,
+  normalizeBlocks,
+  cloneBlocks,
+  createMediaBlock,
+} from '../utils/entryBlocks.js';
 
 function formatDate(date) {
   const d = date instanceof Date ? date : new Date(date);
@@ -34,42 +43,20 @@ export default function ViewEntry() {
 
   const [entry, setEntry] = useState(null);
   const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
+  const [blocks, setBlocks] = useState([]);
   const [mood, setMood] = useState('');
   const [initialTitle, setInitialTitle] = useState('');
-  const [initialContent, setInitialContent] = useState('');
+  const [initialBlocks, setInitialBlocks] = useState([]);
   const [initialMood, setInitialMood] = useState('');
+  const [savedMediaIds, setSavedMediaIds] = useState([]);
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
-  const [pendingFiles, setPendingFiles] = useState([]);
-  const [mediaCount, setMediaCount] = useState(0);
-  const [mediaRefresh, setMediaRefresh] = useState(0);
   const [uploadStatus, setUploadStatus] = useState('');
 
-  // Restore edit draft callback
-  const handleRestoreEditDraft = useCallback((draft) => {
-    if (draft.title) setTitle(draft.title);
-    if (draft.content) setContent(draft.content);
-    if (draft.mood) setMood(draft.mood);
-  }, []);
-
-  // Auto-save hook for editing existing entry
-  const {
-    autoSaveEnabled,
-    toggleAutoSave,
-    status: autoSaveStatus,
-    lastSavedAt,
-    clearDraft: clearEditDraft,
-  } = useAutoSave({
-    draftId: `edit_entry_${id}`,
-    data: editing ? { title, content, mood } : {},
-    onRestore: handleRestoreEditDraft,
-  });
-
-  // ─── Load & decrypt entry ──────────────────────────────────────────────────
+  // ─── Load & decrypt entry (old attachments become inline blocks at the end) ──
   useEffect(() => {
     const load = async () => {
       try {
@@ -83,9 +70,29 @@ export default function ViewEntry() {
           decrypt(cryptoKey, data.entry.encryptedContent, data.entry.ivContent),
         ]);
         setTitle(decTitle);
-        setContent(decContent);
         setInitialTitle(decTitle);
-        setInitialContent(decContent);
+
+        let parsed = parseEntryContent(decContent);
+        let mediaIds = [];
+        try {
+          const metas = await listMedia(id);
+          mediaIds = metas.map((m) => m._id);
+          const referenced = referencedMediaIds(parsed);
+          const unreferenced = metas.filter((m) => !referenced.has(m._id));
+          if (unreferenced.length > 0) {
+            parsed = [
+              ...parsed,
+              ...unreferenced.map((m) => createMediaBlock({ mediaId: m._id })),
+            ];
+          }
+        } catch (_) {
+          // Attachments are optional — the entry itself still loads
+        }
+
+        const normalized = normalizeBlocks(parsed);
+        setBlocks(normalized);
+        setInitialBlocks(cloneBlocks(normalized));
+        setSavedMediaIds(mediaIds);
       } catch (err) {
         toast.error('Failed to load entry');
         navigate('/dashboard');
@@ -101,51 +108,74 @@ export default function ViewEntry() {
     }
   }, [id, cryptoKey, navigate]);
 
+  const encryptEntry = async (blocksToSave) => {
+    const { ciphertext: encryptedTitle, iv } = await encrypt(cryptoKey, title.trim());
+    const { ciphertext: encryptedContent, iv: ivContent } = await encrypt(
+      cryptoKey,
+      serializeBlocks(blocksToSave)
+    );
+    return {
+      encryptedTitle,
+      encryptedContent,
+      iv,
+      ivContent,
+      mood,
+      wordCount: countBlockWords(blocksToSave),
+    };
+  };
+
   // ─── Save edited entry ─────────────────────────────────────────────────────
   const handleSave = async () => {
-    if (!title.trim() || !content.trim()) {
-      toast.error('Title and content cannot be empty');
+    if (!title.trim()) {
+      toast.error('Title cannot be empty');
+      return;
+    }
+    if (!hasBlockContent(blocks)) {
+      toast.error('Entry cannot be empty — add some text or media');
       return;
     }
     setSaving(true);
     try {
-      const { ciphertext: encryptedTitle, iv } = await encrypt(cryptoKey, title.trim());
-      const { ciphertext: encryptedContent, iv: ivContent } = await encrypt(cryptoKey, content.trim());
-      const wordCount = content.trim().split(/\s+/).length;
-
-      const { data } = await apiClient.put(`/entries/${id}`, {
-        encryptedTitle,
-        encryptedContent,
-        iv,
-        ivContent,
-        mood,
-        wordCount,
-      });
-
-      setEntry(data.entry);
-      setInitialTitle(title);
-      setInitialContent(content);
-      setInitialMood(mood);
-
-      // Encrypt + upload newly added attachments
+      // 1. Encrypt + upload newly inserted files
+      const pending = blocks.filter((b) => b.type === 'media' && b.file);
       let failedUploads = 0;
-      if (pendingFiles.length > 0) {
-        for (let i = 0; i < pendingFiles.length; i++) {
-          try {
-            setUploadStatus(`Encrypting & uploading ${i + 1} of ${pendingFiles.length}: ${pendingFiles[i].name}`);
-            await uploadMediaFile(cryptoKey, id, pendingFiles[i]);
-          } catch (uploadErr) {
-            failedUploads++;
-            console.error('Media upload failed:', uploadErr);
-          }
+      let finalBlocks = [...blocks];
+
+      for (let i = 0; i < pending.length; i++) {
+        const block = pending[i];
+        try {
+          setUploadStatus(`Encrypting & uploading ${i + 1} of ${pending.length}: ${block.file.name}`);
+          const media = await uploadMediaFile(cryptoKey, id, block.file);
+          finalBlocks = finalBlocks.map((b) =>
+            b.key === block.key ? { ...b, mediaId: media._id, tempId: null, file: null } : b
+          );
+        } catch (uploadErr) {
+          failedUploads++;
+          console.error('Media upload failed:', uploadErr);
+          finalBlocks = finalBlocks.filter((b) => b.key !== block.key);
         }
-        setUploadStatus('');
-        setPendingFiles([]);
-        setMediaRefresh((n) => n + 1);
+      }
+      setUploadStatus('');
+      finalBlocks = normalizeBlocks(finalBlocks);
+
+      // 2. Save the entry with the final block order
+      const { data } = await apiClient.put(`/entries/${id}`, await encryptEntry(finalBlocks));
+      setEntry(data.entry);
+
+      // 3. Delete saved media whose blocks were removed while editing
+      const stillReferenced = referencedMediaIds(finalBlocks);
+      const removedIds = savedMediaIds.filter((mediaId) => !stillReferenced.has(mediaId));
+      if (removedIds.length > 0) {
+        await Promise.allSettled(removedIds.map((mediaId) => deleteMedia(mediaId)));
       }
 
+      setBlocks(finalBlocks);
+      setInitialBlocks(cloneBlocks(finalBlocks));
+      setInitialTitle(title);
+      setInitialMood(mood);
+      setSavedMediaIds([...stillReferenced]);
       setEditing(false);
-      clearEditDraft();
+
       if (failedUploads > 0) {
         toast.error(`Entry updated, but ${failedUploads} attachment${failedUploads === 1 ? '' : 's'} failed to upload`);
       } else {
@@ -164,7 +194,6 @@ export default function ViewEntry() {
     setDeleting(true);
     try {
       await apiClient.delete(`/entries/${id}`);
-      clearEditDraft();
       toast.success('Entry deleted');
       navigate('/dashboard');
     } catch {
@@ -175,25 +204,20 @@ export default function ViewEntry() {
 
   const handleCancelEdit = () => {
     setTitle(initialTitle);
-    setContent(initialContent);
+    setBlocks(cloneBlocks(initialBlocks));
     setMood(initialMood);
-    setPendingFiles([]);
     setEditing(false);
-    clearEditDraft();
   };
 
   // ─── Loading skeleton ──────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="min-h-screen transition-colors duration-200" style={{ background: 'var(--bg-app)' }}>
+      <div className="h-dvh flex flex-col overflow-hidden transition-colors duration-200" style={{ background: 'var(--bg-app)' }}>
         <Navbar />
-        <main className="max-w-3xl mx-auto px-4 py-8">
+        <main className="flex-1 min-h-0 w-full max-w-3xl mx-auto px-3 sm:px-6 py-4">
           <div
-            className="rounded-2xl p-8 space-y-4 shadow-sm"
-            style={{
-              background: 'var(--panel-gradient)',
-              border: '1px solid var(--border-color)',
-            }}
+            className="rounded-2xl p-6 space-y-4 shadow-sm h-full"
+            style={{ background: 'var(--panel-gradient)', border: '1px solid var(--border-color)' }}
           >
             <div className="h-8 rounded w-2/3 skeleton" />
             <div className="h-3 rounded w-1/3 skeleton" />
@@ -209,18 +233,19 @@ export default function ViewEntry() {
   }
 
   const currentMood = moodMap[mood];
-  const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
+  const wordCount = countBlockWords(blocks);
   const createdAtDate = entry ? new Date(entry.createdAt) : new Date();
+  const canSave = Boolean(title.trim()) && hasBlockContent(blocks);
 
   return (
-    <div className="min-h-screen transition-colors duration-200" style={{ background: 'var(--bg-app)' }}>
+    <div className="h-dvh flex flex-col overflow-hidden transition-colors duration-200" style={{ background: 'var(--bg-app)' }}>
       <Navbar />
 
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
+      <main className="flex-1 min-h-0 w-full max-w-3xl mx-auto px-3 sm:px-6 py-3 sm:py-6 flex flex-col">
         {/* Back */}
         <button
           onClick={() => navigate('/dashboard')}
-          className="flex items-center gap-1.5 text-sm mb-8 transition-colors cursor-pointer"
+          className="flex items-center gap-1.5 text-sm mb-3 flex-shrink-0 self-start transition-colors cursor-pointer"
           style={{ color: 'var(--text-muted)' }}
           onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--gold)'; }}
           onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
@@ -230,7 +255,7 @@ export default function ViewEntry() {
         </button>
 
         <article
-          className="rounded-2xl overflow-hidden fade-up shadow-sm"
+          className="flex-1 min-h-0 flex flex-col rounded-2xl overflow-hidden fade-up shadow-sm"
           style={{
             background: 'var(--panel-gradient)',
             border: '1px solid var(--border-color)',
@@ -238,83 +263,38 @@ export default function ViewEntry() {
         >
           {/* Gold top accent */}
           <div
-            className="h-px"
+            className="h-px flex-shrink-0"
             style={{ background: 'linear-gradient(90deg, transparent, var(--gold), transparent)' }}
           />
 
           {/* Header */}
           <div
-            className="px-6 sm:px-8 pt-6 pb-5"
+            className="px-4 sm:px-8 pt-4 pb-4 flex-shrink-0"
             style={{ borderBottom: '1px solid var(--border-color)' }}
           >
-            {/* Date + badges + AutoSave control if editing */}
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs uppercase tracking-widest font-medium" style={{ color: 'var(--text-muted)' }}>
-                  {formatDate(createdAtDate)} · {formatTime(createdAtDate)}
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <span className="text-[11px] sm:text-xs uppercase tracking-widest font-medium" style={{ color: 'var(--text-muted)' }}>
+                {formatDate(createdAtDate)} · {formatTime(createdAtDate)}
+              </span>
+              {wordCount > 0 && !editing && (
+                <span className="text-xs" style={{ color: 'var(--text-ghost)' }}>
+                  · {wordCount} {wordCount === 1 ? 'word' : 'words'}
                 </span>
-                {wordCount > 0 && !editing && (
-                  <span className="text-xs" style={{ color: 'var(--text-ghost)' }}>
-                    · {wordCount} {wordCount === 1 ? 'word' : 'words'}
-                  </span>
-                )}
-                {!editing && currentMood && (
-                  <span
-                    className="flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full"
-                    style={{
-                      background: `${currentMood.color}15`,
-                      border: `1px solid ${currentMood.color}35`,
-                      color: currentMood.color,
-                    }}
-                  >
-                    {currentMood.emoji} {currentMood.label}
-                  </span>
-                )}
-              </div>
-
-              {editing && (
-                <button
-                  type="button"
-                  onClick={toggleAutoSave}
-                  title={autoSaveEnabled ? "Click to disable auto-save" : "Click to enable auto-save"}
-                  className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer"
+              )}
+              {!editing && currentMood && (
+                <span
+                  className="flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full"
                   style={{
-                    background: autoSaveEnabled ? 'rgba(196, 145, 58, 0.12)' : 'var(--bg-elevated)',
-                    border: '1px solid var(--border-color)',
-                    color: autoSaveEnabled ? 'var(--gold)' : 'var(--text-muted)',
+                    background: `${currentMood.color}15`,
+                    border: `1px solid ${currentMood.color}35`,
+                    color: currentMood.color,
                   }}
                 >
-                  {autoSaveStatus === 'saving' ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Saving draft...</span>
-                    </>
-                  ) : autoSaveStatus === 'saved' || autoSaveStatus === 'restored' ? (
-                    <>
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>
-                        Auto-saved{' '}
-                        {lastSavedAt
-                          ? lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                          : ''}
-                      </span>
-                    </>
-                  ) : !autoSaveEnabled ? (
-                    <>
-                      <CloudOff className="w-3.5 h-3.5" />
-                      <span>Auto-save Off</span>
-                    </>
-                  ) : (
-                    <>
-                      <Cloud className="w-3.5 h-3.5" />
-                      <span>Auto-save On</span>
-                    </>
-                  )}
-                </button>
+                  {currentMood.emoji} {currentMood.label}
+                </span>
               )}
             </div>
 
-            {/* Title */}
             {editing ? (
               <input
                 type="text"
@@ -339,171 +319,109 @@ export default function ViewEntry() {
             )}
           </div>
 
-          {/* Body */}
-          <div className="px-6 sm:px-8 py-8">
+          {/* Body — only this part scrolls, and only when content is long */}
+          <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 py-4">
             {editing ? (
-              <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                rows={16}
-                className="w-full outline-none rounded-xl px-4 py-3 text-sm sm:text-base leading-[1.9]"
-                style={{
-                  background: 'var(--bg-input)',
-                  border: '1px solid var(--border-color)',
-                  color: 'var(--text-body)',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--border-bright)';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--border-color)';
-                }}
-              />
+              <BlockEditor blocks={blocks} onChange={setBlocks} cryptoKey={cryptoKey} disabled={saving} />
             ) : (
-              <div
-                className="font-sans text-sm sm:text-base leading-[1.95] whitespace-pre-wrap"
-                style={{ color: 'var(--text-body)' }}
-              >
-                {content}
-              </div>
+              <EntryContent blocks={blocks} cryptoKey={cryptoKey} />
             )}
           </div>
 
-          {/* Attachments (decrypted in-browser) */}
+          {/* Footer — always visible */}
           <div
-            className="px-6 sm:px-8"
-            style={{ paddingBottom: mediaCount > 0 || editing ? '2rem' : 0 }}
+            className="px-4 sm:px-8 py-3 flex-shrink-0 space-y-3"
+            style={{ borderTop: '1px solid var(--border-color)', background: 'var(--bg-surface)' }}
           >
-            <MediaGallery
-              entryId={id}
-              cryptoKey={cryptoKey}
-              editable={editing}
-              refreshKey={mediaRefresh}
-              onCountChange={setMediaCount}
-            />
+            {uploadStatus && (
+              <p className="flex items-center gap-2 text-xs" style={{ color: 'var(--gold)' }}>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                {uploadStatus}
+              </p>
+            )}
+
             {editing && (
-              <div className="mt-5">
-                <p className="text-xs uppercase tracking-widest font-medium mb-3" style={{ color: 'var(--text-muted)' }}>
-                  Add Photos &amp; Media
-                </p>
-                <MediaPicker
-                  files={pendingFiles}
-                  onChange={setPendingFiles}
-                  existingCount={mediaCount}
-                  disabled={saving}
-                />
-                {uploadStatus && (
-                  <p className="flex items-center gap-2 text-xs mt-3" style={{ color: 'var(--gold)' }}>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    {uploadStatus}
-                  </p>
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 [&>div]:flex-nowrap [&>div]:w-max">
+                <span className="text-[11px] uppercase tracking-widest font-medium flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
+                  Mood
+                </span>
+                <MoodPicker value={mood} onChange={setMood} />
+              </div>
+            )}
+
+            <div className="flex items-center justify-between gap-3">
+              {/* Delete */}
+              <div className="min-w-0">
+                {showDelete ? (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs sm:text-sm" style={{ color: 'var(--text-muted)' }}>Delete this entry?</span>
+                    <button
+                      onClick={handleDelete}
+                      disabled={deleting}
+                      className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all cursor-pointer disabled:opacity-50"
+                      style={{ background: 'rgba(224,85,85,0.15)', color: '#e05555', border: '1px solid rgba(224,85,85,0.3)' }}
+                    >
+                      {deleting ? 'Deleting…' : 'Yes, delete'}
+                    </button>
+                    <button
+                      onClick={() => setShowDelete(false)}
+                      className="text-xs cursor-pointer"
+                      style={{ color: 'var(--text-ghost)' }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowDelete(true)}
+                    className="flex items-center gap-1.5 text-sm transition-colors cursor-pointer"
+                    style={{ color: 'var(--text-ghost)' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = '#e05555'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-ghost)'; }}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Delete</span>
+                  </button>
                 )}
               </div>
-            )}
-          </div>
 
-          {/* Mood editor (edit mode) */}
-          {editing && (
-            <div
-              className="px-6 sm:px-8 pb-5"
-              style={{ borderTop: '1px solid var(--border-color)' }}
-            >
-              <p className="text-xs uppercase tracking-widest font-medium mt-5 mb-3" style={{ color: 'var(--text-muted)' }}>
-                Mood
-              </p>
-              <MoodPicker value={mood} onChange={setMood} />
-            </div>
-          )}
-
-          {/* Footer actions */}
-          <div
-            className="px-6 sm:px-8 py-5 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-4"
-            style={{ borderTop: '1px solid var(--border-color)' }}
-          >
-            {/* Delete */}
-            <div>
-              {showDelete ? (
-                <div className="flex items-center gap-3">
-                  <span className="text-sm" style={{ color: 'var(--text-muted)' }}>Delete this entry?</span>
+              {/* Edit / Save / Cancel */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {editing ? (
+                  <>
+                    <button
+                      onClick={handleCancelEdit}
+                      className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg transition-all cursor-pointer"
+                      style={{ color: 'var(--text-muted)' }}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSave}
+                      disabled={saving || !canSave}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 cursor-pointer shadow-sm"
+                      style={{ background: 'linear-gradient(135deg, #c4913a, #dba84a)', color: '#0c0c17' }}
+                    >
+                      {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                      {saving ? 'Saving…' : 'Save Changes'}
+                    </button>
+                  </>
+                ) : (
                   <button
-                    onClick={handleDelete}
-                    disabled={deleting}
-                    className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all cursor-pointer"
-                    style={{ background: 'rgba(224,85,85,0.15)', color: '#e05555', border: '1px solid rgba(224,85,85,0.3)' }}
-                  >
-                    {deleting ? 'Deleting…' : 'Yes, delete'}
-                  </button>
-                  <button
-                    onClick={() => setShowDelete(false)}
-                    className="text-xs cursor-pointer"
-                    style={{ color: 'var(--text-ghost)' }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setShowDelete(true)}
-                  className="flex items-center gap-1.5 text-sm transition-colors cursor-pointer"
-                  style={{ color: 'var(--text-ghost)' }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = '#e05555'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-ghost)'; }}
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  Delete
-                </button>
-              )}
-            </div>
-
-            {/* Edit / Save / Cancel */}
-            <div className="flex items-center gap-2">
-              {editing ? (
-                <>
-                  <button
-                    onClick={handleCancelEdit}
-                    className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg transition-all cursor-pointer"
-                    style={{ color: 'var(--text-muted)' }}
-                  >
-                    <X className="w-3.5 h-3.5" />
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSave}
-                    disabled={saving || !title.trim() || !content.trim()}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 cursor-pointer shadow-sm"
+                    onClick={() => setEditing(true)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer"
                     style={{
-                      background: 'linear-gradient(135deg, #c4913a, #dba84a)',
-                      color: '#0c0c17',
+                      background: 'var(--gold-glow)',
+                      border: '1px solid var(--border-bright)',
+                      color: 'var(--gold)',
                     }}
                   >
-                    {saving ? (
-                      <span className="w-3.5 h-3.5 border-2 border-ink/30 border-t-ink rounded-full animate-spin" />
-                    ) : (
-                      <Save className="w-3.5 h-3.5" />
-                    )}
-                    {saving ? 'Saving…' : 'Save Changes'}
+                    <Pencil className="w-3.5 h-3.5" />
+                    Edit
                   </button>
-                </>
-              ) : (
-                <button
-                  onClick={() => setEditing(true)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer"
-                  style={{
-                    background: 'var(--gold-glow)',
-                    border: '1px solid var(--border-bright)',
-                    color: 'var(--gold)',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(196,145,58,0.16)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'var(--gold-glow)';
-                  }}
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                  Edit
-                </button>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </article>

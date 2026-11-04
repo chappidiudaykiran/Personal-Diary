@@ -129,6 +129,28 @@ router.get('/:mediaId/file', async (req, res) => {
   }
 });
 
+// ─── GET /api/media/:mediaId ──────────────────────────────────────────────────
+// Metadata for a single media item (no file bytes).
+router.get('/:mediaId', async (req, res) => {
+  try {
+    if (!isValidId(req.params.mediaId)) {
+      return res.status(400).json({ message: 'Invalid media ID' });
+    }
+
+    const media = await Media.findOne({ _id: req.params.mediaId, userId: req.user._id })
+      .select('iv encryptedName nameIv encryptedMime mimeIv size createdAt entryId')
+      .lean();
+    if (!media) {
+      return res.status(404).json({ message: 'Media not found' });
+    }
+
+    res.json({ media });
+  } catch (error) {
+    console.error('Get media error:', error);
+    res.status(500).json({ message: 'Failed to fetch media' });
+  }
+});
+
 // ─── DELETE /api/media/:mediaId ───────────────────────────────────────────────
 router.delete('/:mediaId', async (req, res) => {
   try {
