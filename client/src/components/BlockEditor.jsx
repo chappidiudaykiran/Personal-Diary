@@ -50,7 +50,6 @@ function AutoTextarea({ blockKey, value, onChange, onCursor, placeholder, disabl
   );
 }
 
-// Preview for file when in wrap mode - fills its container (container width controls size via drag)
 function AsideFilePreview({ file }) {
   const [url, setUrl] = useState(null);
   const kind = kindFromMime(file.type, file.name);
@@ -63,25 +62,19 @@ function AsideFilePreview({ file }) {
     setUrl(null);
   }, [file]);
   if (kind === 'image' && url) {
-    return <img src={url} alt={file.name} className="w-full rounded-lg object-cover" style={{ maxHeight: '260px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)' }} />;
+    return <img src={url} alt={file.name} className="w-full rounded-xl object-cover block" style={{ maxHeight: '65vh', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)' }} />;
   }
   if (kind === 'video' && url) {
-    return <video src={url} controls playsInline className="w-full rounded-lg" style={{ maxHeight: '260px', background: '#000', border: '1px solid var(--border-color)' }} />;
+    return <video src={url} controls playsInline className="w-full rounded-xl block" style={{ maxHeight: '65vh', background: '#000', border: '1px solid var(--border-color)' }} />;
   }
   return (
-    <div className="flex items-center gap-2 rounded-lg px-2 py-2 w-full" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)' }}>
+    <div className="flex items-center gap-2 rounded-xl px-3 py-2 w-full" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)' }}>
       {kind === 'audio' ? <FileAudio className="w-4 h-4" style={{ color: 'var(--gold)' }} /> : <FileText className="w-4 h-4" style={{ color: 'var(--gold)' }} />}
       <span className="text-xs truncate flex-1" style={{ color: 'var(--text-muted)' }}>{file.name}</span>
     </div>
   );
 }
 
-/**
- * Block editor: media is wrapping by default.
- * Text typed after media appears on the right side of the image (same row).
- * Pressing Enter / creating next block starts text below the image (clears wrap).
- * Image size adjustable by selecting image and dragging handle.
- */
 export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = false }) {
   const fileInputRef = useRef(null);
   const activeRef = useRef({ key: null, cursor: 0 });
@@ -97,9 +90,10 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
   }, [blocks]);
 
   useEffect(() => {
-    const onDocClick = (e) => { if (!e.target.closest('[data-media-block]')) setSelectedKey(null); };
-    document.addEventListener('click', onDocClick);
-    return () => document.removeEventListener('click', onDocClick);
+    const onDocDown = (e) => { if (!e.target.closest('[data-media-block]')) setSelectedKey(null); };
+    document.addEventListener('mousedown', onDocDown);
+    document.addEventListener('touchstart', onDocDown);
+    return () => { document.removeEventListener('mousedown', onDocDown); document.removeEventListener('touchstart', onDocDown); };
   }, []);
 
   const handleCursor = (key, cursor) => { activeRef.current = { key, cursor }; };
@@ -158,17 +152,33 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
     const next = [...blocks]; [next[index], next[target]] = [next[target], next[index]]; onChange(next);
   };
 
-  const handleDragStart = (e, index) => {
+  const handleDragStart = (e, index, handle) => {
     if (disabled) return;
     e.preventDefault(); e.stopPropagation();
-    const startX = e.clientX ?? e.touches?.[0]?.clientX; if (startX == null) return;
+    const startX = e.clientX ?? e.touches?.[0]?.clientX;
+    const startY = e.clientY ?? e.touches?.[0]?.clientY;
+    if (startX == null) return;
     const startW = clampAsideWidth(blocks[index].width ?? 38);
-    const rowEl = document.getElementById(`media-wrap-row-${blocks[index].key}`);
-    const parentW = rowEl ? rowEl.clientWidth : window.innerWidth * 0.85;
+    const container = document.getElementById(`media-box-${blocks[index].key}`);
+    const parentW = container?.parentElement?.clientWidth || window.innerWidth * 0.85;
     const onMove = (ev) => {
-      const x = ev.clientX ?? ev.touches?.[0]?.clientX; if (x == null) return;
+      const x = ev.clientX ?? ev.touches?.[0]?.clientX;
+      const y = ev.clientY ?? ev.touches?.[0]?.clientY;
+      if (x == null) return;
       if (ev.cancelable) ev.preventDefault();
-      const dx = x - startX; const newW = clampAsideWidth(startW + (dx / parentW) * 100); setBlockWidth(index, newW);
+      let dx = x - startX;
+      let dy = y - startY;
+      let delta = 0;
+      // Decide delta based on handle side
+      if (handle.includes('r')) delta = dx;
+      else if (handle.includes('l')) delta = -dx;
+      else if (handle.includes('b')) delta = dy;
+      else if (handle.includes('t')) delta = -dy;
+      else delta = dx;
+      // Corners use larger of dx/dy
+      if (handle.length === 2) delta = Math.abs(dx) > Math.abs(dy) ? (handle.includes('r') ? dx : handle.includes('l') ? -dx : dx) : (handle.includes('b') ? dy : -dy);
+      const newW = clampAsideWidth(startW + (delta / parentW) * 100);
+      setBlockWidth(index, newW);
     };
     const onUp = () => {
       window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp);
@@ -178,114 +188,81 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
     window.addEventListener('touchmove', onMove, { passive: false }); window.addEventListener('touchend', onUp);
   };
 
-  // Render with wrapping: media + immediate next text block share same flex row (text on right)
-  const rendered = [];
-  for (let i = 0; i < blocks.length; i++) {
-    const block = blocks[i];
-    if (block.type === 'text') {
-      // If previous was media that already consumed this text, skip (handled below)
-      // This case is only for standalone text blocks not wrapped with media
-      rendered.push(
-        <AutoTextarea
-          key={block.key}
-          blockKey={block.key}
-          value={block.text}
-          disabled={disabled}
-          first={i === 0}
-          placeholder={i === 0 ? 'Write freely. This is your safe space.' : 'Continue writing…'}
-          onCursor={handleCursor}
-          onChange={(text) => { const next = [...blocks]; next[i] = { ...block, text }; onChange(next); }}
-        />
-      );
-      continue;
-    }
-    // media block - wrap with next text block if exists (text appears on right side)
-    const width = clampAsideWidth(block.width ?? 38);
-    const isSelected = selectedKey === block.key;
-    const nextBlock = i + 1 < blocks.length ? blocks[i + 1] : null;
-    const hasNextText = nextBlock && nextBlock.type === 'text';
-    // Build right-side textarea for the next text block (if any)
-    let rightTextArea = null;
-    if (hasNextText) {
-      const nextIndex = i + 1;
-      const nb = nextBlock;
-      rightTextArea = (
-        <div className="flex-1 min-w-0">
-          <AutoTextarea
-            key={nb.key}
-            blockKey={nb.key}
-            value={nb.text}
-            disabled={disabled}
-            first={false}
-            placeholder="Write beside image… (Enter for new line below)"
-            onCursor={handleCursor}
-            onChange={(text) => { const next = [...blocks]; next[nextIndex] = { ...nb, text }; onChange(next); }}
-          />
-          <div className="text-[10px] mt-1" style={{ color: 'var(--text-ghost)' }}>Text wraps on right — press Enter to continue below image</div>
-        </div>
-      );
-    }
-
-    rendered.push(
-      <div
-        key={block.key}
-        data-media-block
-        className={`relative my-3 rounded-xl p-2 ${isSelected ? 'ring-2 ring-amber-400/60' : ''}`}
-        style={{ border: '1px dashed var(--border-color)', background: 'var(--bg-elevated)' }}
-        onClick={(e) => { e.stopPropagation(); setSelectedKey(block.key); }}
-      >
-        <div id={`media-wrap-row-${block.key}`} className="flex flex-col sm:flex-row gap-3 items-stretch">
-          <div className="relative flex-shrink-0 self-start" style={{ width: `${width}%`, minWidth: '110px', maxWidth: '62%' }}>
-            {block.file ? <AsideFilePreview file={block.file} /> : block.mediaId ? <InlineMedia cryptoKey={cryptoKey} mediaId={block.mediaId} layout="aside" width={width} /> : null}
-            {!disabled && (
-              <>
-                <div
-                  onMouseDown={(e) => handleDragStart(e, i)}
-                  onTouchStart={(e) => handleDragStart(e, i)}
-                  className={`absolute top-1/2 -translate-y-1/2 -right-2 w-5 h-16 rounded-full flex items-center justify-center cursor-ew-resize touch-none select-none transition-opacity ${isSelected ? 'opacity-100' : 'opacity-60 sm:opacity-0 sm:group-hover:opacity-100'}`}
-                  style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
-                >
-                  <div className="w-1 h-8 rounded-full" style={{ background: 'rgba(255,255,255,0.9)' }} />
-                </div>
-                <div
-                  onMouseDown={(e) => handleDragStart(e, i)}
-                  onTouchStart={(e) => handleDragStart(e, i)}
-                  className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center cursor-nwse-resize touch-none select-none border-2 transition-opacity ${isSelected ? 'opacity-100' : 'opacity-70 sm:opacity-0 sm:group-hover:opacity-100'}`}
-                  style={{ background: '#fff', borderColor: 'var(--gold)', boxShadow: '0 1px 6px rgba(0,0,0,0.3)' }}
-                >
-                  <div className="w-2 h-2 rounded-sm" style={{ background: 'var(--gold)' }} />
-                </div>
-                <div className="absolute -bottom-6 right-0 text-[10px] px-1.5 py-0.5 rounded-full font-medium" style={{ background: 'rgba(0,0,0,0.65)', color: '#fff' }}>{width}%</div>
-              </>
-            )}
-          </div>
-          {hasNextText ? rightTextArea : (
-            <div className="flex-1 min-w-0 rounded-lg px-3 py-6 flex items-center justify-center text-xs text-center" style={{ border: '1px dashed var(--border-color)', color: 'var(--text-ghost)', background: 'var(--bg-raised)' }}>
-              Text will appear on right side — start typing after image
-            </div>
-          )}
-        </div>
-        {!disabled && (
-          <div className="absolute top-2 right-2 flex items-center gap-1">
-            <button type="button" onClick={() => moveBlock(i, -1)} disabled={i === 0} className="w-7 h-7 rounded-full flex items-center justify-center cursor-pointer disabled:opacity-30" style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}><ChevronUp className="w-4 h-4" /></button>
-            <button type="button" onClick={() => { const target = i + (hasNextText ? 2 : 1); if (target >= blocks.length) return; const next = [...blocks]; const media = next.splice(i, 1)[0]; const insertAt = hasNextText ? i + 1 : i; next.splice(insertAt + (1), 0, media); onChange(next); }} disabled={i >= blocks.length - 1} className="w-7 h-7 rounded-full flex items-center justify-center cursor-pointer disabled:opacity-30" style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}><ChevronDown className="w-4 h-4" /></button>
-            <button type="button" onClick={() => removeBlock(i)} className="w-7 h-7 rounded-full flex items-center justify-center cursor-pointer" style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}><X className="w-4 h-4" /></button>
-          </div>
-        )}
-        <div className="text-[10px] mt-2 text-center" style={{ color: 'var(--text-ghost)' }}>Select image then drag handle to resize • Next line starts below image</div>
-      </div>
-    );
-    if (hasNextText) i++; // skip next text as it was rendered in wrap row
-  }
-
   return (
     <div className="flex flex-col min-h-full">
-      <div className="flex-1">{rendered}</div>
+      <div className="flex-1">
+        {blocks.map((block, index) => {
+          if (block.type === 'text') {
+            return (
+              <AutoTextarea
+                key={block.key}
+                blockKey={block.key}
+                value={block.text}
+                disabled={disabled}
+                first={index === 0}
+                placeholder={index === 0 ? 'Write freely. This is your safe space.' : 'Continue writing…'}
+                onCursor={handleCursor}
+                onChange={(text) => { const next = [...blocks]; next[index] = { ...block, text }; onChange(next); }}
+              />
+            );
+          }
+          const width = clampAsideWidth(block.width ?? 38);
+          const isSelected = selectedKey === block.key;
+          return (
+            <div key={block.key} data-media-block className="relative my-3 group" style={{ display: 'block' }}>
+              {/* Simple image container - no yellow box, no placeholder text */}
+              <div
+                id={`media-box-${block.key}`}
+                onDoubleClick={(e) => { e.stopPropagation(); setSelectedKey(block.key); }}
+                onClick={(e) => { e.stopPropagation(); /* single click also selects on mobile */ setSelectedKey(block.key); }}
+                className={`relative inline-block align-top ${isSelected ? 'ring-2 ring-amber-400' : ''} rounded-xl`}
+                style={{ width: `${width}%`, minWidth: '90px', maxWidth: '100%', touchAction: 'none' }}
+              >
+                {block.file ? <AsideFilePreview file={block.file} /> : block.mediaId ? <InlineMedia cryptoKey={cryptoKey} mediaId={block.mediaId} width={width} /> : null}
+                {/* Resize handles - only when selected (double-click) */}
+                {isSelected && !disabled && (
+                  <>
+                    {/* 8 handles: corners + mid sides */}
+                    {[
+                      { pos: 'top-1/2 -left-1.5 -translate-y-1/2', cursor: 'cursor-ew-resize', h: 'l' },
+                      { pos: 'top-1/2 -right-1.5 -translate-y-1/2', cursor: 'cursor-ew-resize', h: 'r' },
+                      { pos: 'left-1/2 -top-1.5 -translate-x-1/2', cursor: 'cursor-ns-resize', h: 't' },
+                      { pos: 'left-1/2 -bottom-1.5 -translate-x-1/2', cursor: 'cursor-ns-resize', h: 'b' },
+                      { pos: '-top-1.5 -left-1.5', cursor: 'cursor-nwse-resize', h: 'tl' },
+                      { pos: '-top-1.5 -right-1.5', cursor: 'cursor-nesw-resize', h: 'tr' },
+                      { pos: '-bottom-1.5 -left-1.5', cursor: 'cursor-nesw-resize', h: 'bl' },
+                      { pos: '-bottom-1.5 -right-1.5', cursor: 'cursor-nwse-resize', h: 'br' },
+                    ].map((hd) => (
+                      <div
+                        key={hd.h}
+                        onMouseDown={(e) => handleDragStart(e, index, hd.h)}
+                        onTouchStart={(e) => handleDragStart(e, index, hd.h)}
+                        className={`absolute ${hd.pos} w-3 h-3 bg-white border-2 rounded-full ${hd.cursor} touch-none select-none`}
+                        style={{ borderColor: 'var(--gold)', boxShadow: '0 1px 4px rgba(0,0,0,0.3)' }}
+                      />
+                    ))}
+                  </>
+                )}
+              </div>
+
+              {/* Minimal actions - only show when selected, floating top-right */}
+              {isSelected && !disabled && (
+                <div className="absolute top-1 right-1 flex items-center gap-1 z-10">
+                  <button type="button" onClick={() => moveBlock(index, -1)} disabled={index === 0} className="w-7 h-7 rounded-full flex items-center justify-center cursor-pointer disabled:opacity-30" style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}><ChevronUp className="w-4 h-4" /></button>
+                  <button type="button" onClick={() => moveBlock(index, 1)} disabled={index === blocks.length - 1} className="w-7 h-7 rounded-full flex items-center justify-center cursor-pointer disabled:opacity-30" style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}><ChevronDown className="w-4 h-4" /></button>
+                  <button type="button" onClick={() => removeBlock(index)} className="w-7 h-7 rounded-full flex items-center justify-center cursor-pointer" style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}><X className="w-4 h-4" /></button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
       <div className="sticky bottom-0 mt-3 flex items-center gap-2 rounded-xl px-2 py-2" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', boxShadow: '0 -4px 16px rgba(0,0,0,0.12)' }}>
         <button type="button" disabled={disabled} onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #c4913a, #dba84a)', color: '#0c0c17' }}><ImagePlus className="w-4 h-4" />Media</button>
         <button type="button" disabled={disabled} onClick={insertTextBlock} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium cursor-pointer disabled:opacity-50" style={{ background: 'var(--bg-raised)', border: '1px solid var(--border-color)', color: 'var(--text-muted)' }}><Type className="w-4 h-4" />Text</button>
-        <span className="hidden sm:flex items-center gap-1 text-[11px] ml-1" style={{ color: 'var(--text-ghost)' }}><Lock className="w-3 h-3" />Media inserted at cursor — text wraps on right, Enter goes below</span>
-        <span className="sm:hidden text-[11px] ml-1" style={{ color: 'var(--text-ghost)' }}>Wraps on right</span>
+        <span className="hidden sm:flex items-center gap-1 text-[11px] ml-1" style={{ color: 'var(--text-ghost)' }}><Lock className="w-3 h-3" />Double-click image to resize</span>
+        <span className="sm:hidden text-[11px] ml-1" style={{ color: 'var(--text-ghost)' }}>Double-tap to resize</span>
         <span className="text-[11px] ml-auto flex-shrink-0" style={{ color: 'var(--text-ghost)' }}>{mediaCount}/{MAX_FILES_PER_ENTRY}</span>
       </div>
       <input ref={fileInputRef} type="file" multiple accept={MEDIA_ACCEPT} className="hidden" onChange={(e) => { insertFiles(e.target.files); e.target.value = ''; }} />

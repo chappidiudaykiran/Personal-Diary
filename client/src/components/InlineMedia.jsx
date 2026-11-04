@@ -59,18 +59,12 @@ export function InlineMedia({ cryptoKey, mediaId, layout = 'aside', width = 38 }
 
   if (media.kind === 'image') {
     return (
-      <figure className="m-0 w-full">
-        <img src={media.url} alt={media.name} className="w-full object-contain rounded-xl" style={{ maxHeight: '42vh', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)' }} loading="lazy" />
-        <figcaption className="text-[11px] mt-1 truncate" style={{ color: 'var(--text-ghost)' }}>{media.name}</figcaption>
-      </figure>
+      <img src={media.url} alt={media.name} className="w-full object-contain rounded-xl block" style={{ maxHeight: '65vh', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)' }} loading="lazy" />
     );
   }
   if (media.kind === 'video') {
     return (
-      <figure className="m-0 w-full">
-        <video src={media.url} controls playsInline preload="metadata" className="w-full rounded-xl" style={{ maxHeight: '42vh', background: '#000', border: '1px solid var(--border-color)' }} />
-        <figcaption className="text-[11px] mt-1 truncate" style={{ color: 'var(--text-ghost)' }}>{media.name}</figcaption>
-      </figure>
+      <video src={media.url} controls playsInline preload="metadata" className="w-full rounded-xl block" style={{ maxHeight: '65vh', background: '#000', border: '1px solid var(--border-color)' }} />
     );
   }
   if (media.kind === 'audio') {
