@@ -9,10 +9,13 @@ import {
 } from '../api/mediaApi.js';
 
 /**
- * Renders one saved media item inline (between paragraphs).
+ * Renders one saved media item.
+ * layout="block": full-width, text goes below it.
+ * layout="inline": flows inside the sentence, text continues after it.
  * Bytes arrive as ciphertext and are decrypted into an in-memory Blob URL.
  */
-export function InlineMedia({ cryptoKey, mediaId }) {
+export function InlineMedia({ cryptoKey, mediaId, layout = 'block' }) {
+  const inline = layout === 'inline';
   const [media, setMedia] = useState(null);
   const [error, setError] = useState('');
   const [downloading, setDownloading] = useState(false);
@@ -70,6 +73,16 @@ export function InlineMedia({ cryptoKey, mediaId }) {
   };
 
   if (error) {
+    if (inline) {
+      return (
+        <span
+          className="inline-flex items-center rounded-lg px-2 py-1 text-[11px] align-middle mx-1"
+          style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: '#e05555' }}
+        >
+          {error}
+        </span>
+      );
+    }
     return (
       <div
         className="rounded-xl px-4 py-6 text-center text-xs my-3"
@@ -81,6 +94,16 @@ export function InlineMedia({ cryptoKey, mediaId }) {
   }
 
   if (!media || ((media.kind === 'image' || media.kind === 'video' || media.kind === 'audio') && !media.url)) {
+    if (inline) {
+      return (
+        <span
+          className="inline-flex items-center justify-center rounded-lg align-middle mx-1 h-24 w-36"
+          style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)' }}
+        >
+          <Loader2 className="w-4 h-4 animate-spin" style={{ color: 'var(--text-ghost)' }} />
+        </span>
+      );
+    }
     return (
       <div
         className="rounded-xl h-44 flex items-center justify-center my-3"
@@ -88,6 +111,60 @@ export function InlineMedia({ cryptoKey, mediaId }) {
       >
         <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--text-ghost)' }} />
       </div>
+    );
+  }
+
+  if (inline) {
+    if (media.kind === 'image') {
+      return (
+        <img
+          src={media.url}
+          alt={media.name}
+          title={media.name}
+          className="inline-block h-28 sm:h-36 w-auto max-w-[75%] object-cover rounded-lg align-middle mx-1 my-1"
+          style={{ border: '1px solid var(--border-color)' }}
+          loading="lazy"
+        />
+      );
+    }
+    if (media.kind === 'video') {
+      return (
+        <video
+          src={media.url}
+          controls
+          playsInline
+          preload="metadata"
+          title={media.name}
+          className="inline-block w-60 max-w-[85%] rounded-lg align-middle mx-1 my-1"
+          style={{ background: '#000', border: '1px solid var(--border-color)' }}
+        />
+      );
+    }
+    if (media.kind === 'audio') {
+      return (
+        <span
+          className="inline-flex items-center gap-2 rounded-lg px-2 py-1 align-middle mx-1"
+          style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)' }}
+          title={media.name}
+        >
+          <FileAudio className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--gold)' }} />
+          <audio controls src={media.url} className="h-8 w-48 max-w-[60vw]" />
+        </span>
+      );
+    }
+    return (
+      <button
+        type="button"
+        onClick={handleDownload}
+        disabled={downloading}
+        title={media.name}
+        className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] align-middle mx-1 cursor-pointer disabled:opacity-50"
+        style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-bright)', color: 'var(--gold)' }}
+      >
+        {downloading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+        <span className="max-w-[140px] truncate">{media.name}</span>
+        <Download className="w-3 h-3" />
+      </button>
     );
   }
 
@@ -163,27 +240,50 @@ export function InlineMedia({ cryptoKey, mediaId }) {
   );
 }
 
-/** Read-only rendering of an entry's blocks: paragraphs with media in between. */
+/**
+ * Read-only rendering of an entry's blocks.
+ * "inline" media flows inside the current paragraph (text continues after
+ * it on the same line); "block" media breaks the paragraph and sits
+ * full-width with the text below it.
+ */
 export default function EntryContent({ blocks, cryptoKey }) {
-  return (
-    <div>
-      {(blocks || []).map((block) => {
-        if (block.type === 'media') {
-          return block.mediaId ? (
-            <InlineMedia key={block.key} cryptoKey={cryptoKey} mediaId={block.mediaId} />
-          ) : null;
-        }
-        if (!block.text?.trim()) return null;
-        return (
-          <div
-            key={block.key}
-            className="font-sans text-sm sm:text-base leading-[1.95] whitespace-pre-wrap my-2"
-            style={{ color: 'var(--text-body)' }}
-          >
-            {block.text}
-          </div>
+  const nodes = [];
+  let flow = [];
+  let flowKey = 0;
+
+  const flushFlow = () => {
+    if (flow.length === 0) return;
+    nodes.push(
+      <div
+        key={`flow-${flowKey++}`}
+        className="font-sans text-sm sm:text-base leading-[1.95] whitespace-pre-wrap my-2"
+        style={{ color: 'var(--text-body)' }}
+      >
+        {flow}
+      </div>
+    );
+    flow = [];
+  };
+
+  for (const block of blocks || []) {
+    if (block.type === 'text') {
+      if (block.text?.trim()) {
+        flow.push(<span key={block.key}>{block.text}</span>);
+      }
+    } else if (block.type === 'media' && block.mediaId) {
+      if (block.layout === 'inline') {
+        flow.push(
+          <InlineMedia key={block.key} cryptoKey={cryptoKey} mediaId={block.mediaId} layout="inline" />
         );
-      })}
-    </div>
-  );
+      } else {
+        flushFlow();
+        nodes.push(
+          <InlineMedia key={block.key} cryptoKey={cryptoKey} mediaId={block.mediaId} layout="block" />
+        );
+      }
+    }
+  }
+  flushFlow();
+
+  return <div>{nodes}</div>;
 }

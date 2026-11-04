@@ -57,9 +57,10 @@ function AutoTextarea({ blockKey, value, onChange, onCursor, placeholder, disabl
   );
 }
 
-function PendingMediaPreview({ file }) {
+function PendingMediaPreview({ file, layout = 'block' }) {
   const [url, setUrl] = useState(null);
   const kind = kindFromMime(file.type, file.name);
+  const inline = layout === 'inline';
 
   useEffect(() => {
     if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
@@ -71,10 +72,18 @@ function PendingMediaPreview({ file }) {
   }, [file]);
 
   if (kind === 'image' && url) {
-    return <img src={url} alt={file.name} className="w-full max-h-[50vh] object-contain rounded-xl" style={{ background: 'var(--bg-elevated)' }} />;
+    return inline ? (
+      <img src={url} alt={file.name} className="h-32 w-auto max-w-[85%] object-cover rounded-lg" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)' }} />
+    ) : (
+      <img src={url} alt={file.name} className="w-full max-h-[50vh] object-contain rounded-xl" style={{ background: 'var(--bg-elevated)' }} />
+    );
   }
   if (kind === 'video' && url) {
-    return <video src={url} controls playsInline className="w-full max-h-[50vh] rounded-xl" style={{ background: '#000' }} />;
+    return inline ? (
+      <video src={url} controls playsInline className="w-60 max-w-[85%] rounded-lg" style={{ background: '#000' }} />
+    ) : (
+      <video src={url} controls playsInline className="w-full max-h-[50vh] rounded-xl" style={{ background: '#000' }} />
+    );
   }
   return (
     <div
@@ -210,6 +219,12 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
     onChange(next);
   };
 
+  const setBlockLayout = (index, layout) => {
+    const next = [...blocks];
+    next[index] = { ...next[index], layout };
+    onChange(next);
+  };
+
   const moveBlock = (index, direction) => {
     const target = index + direction;
     if (target < 0 || target >= blocks.length) return;
@@ -242,13 +257,46 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
           }
 
           // Media block (saved or pending)
+          const layout = block.layout === 'inline' ? 'inline' : 'block';
           return (
             <div key={block.key} className="relative group my-2">
               {block.file ? (
-                <PendingMediaPreview file={block.file} />
+                <PendingMediaPreview file={block.file} layout={layout} />
               ) : block.mediaId ? (
-                <InlineMedia cryptoKey={cryptoKey} mediaId={block.mediaId} />
+                <InlineMedia cryptoKey={cryptoKey} mediaId={block.mediaId} layout={layout} />
               ) : null}
+
+              {/* Layout: text after it on the same line, or below it */}
+              {!disabled && (
+                <div className="flex items-center gap-2 mt-1.5">
+                  <span className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--text-ghost)' }}>
+                    Text
+                  </span>
+                  <div
+                    className="flex rounded-full overflow-hidden"
+                    style={{ border: '1px solid var(--border-color)' }}
+                  >
+                    {[
+                      { value: 'inline', label: 'After it (same line)' },
+                      { value: 'block', label: 'Below it' },
+                    ].map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setBlockLayout(index, option.value)}
+                        className="px-2.5 py-1 text-[11px] font-medium cursor-pointer transition-colors"
+                        style={
+                          layout === option.value
+                            ? { background: 'linear-gradient(135deg, #c4913a, #dba84a)', color: '#0c0c17' }
+                            : { background: 'var(--bg-elevated)', color: 'var(--text-muted)' }
+                        }
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {!disabled && (
                 <div className="absolute top-2 right-2 flex items-center gap-1">

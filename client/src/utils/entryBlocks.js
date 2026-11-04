@@ -2,7 +2,9 @@
 // paragraphs, e.g. text -> photo -> text -> video.
 // The whole list is JSON-stringified and then encrypted like the old
 // plain-text content, so the server format does not change.
-// Serialized shape: [{ "t": "text", "v": "..." }, { "t": "media", "id": "<mediaId>" }]
+// Serialized shape: [{ "t": "text", "v": "..." }, { "t": "media", "id": "<mediaId>", "layout": "inline" }]
+// Media layout: "inline" = text continues after it on the same line,
+// "block" (default) = full-width media with text below it.
 // Legacy entries (plain text, not JSON) load as a single text block.
 
 let counter = 0;
@@ -17,7 +19,7 @@ export function createTextBlock(text = '') {
   return { type: 'text', key: newBlockKey(), text };
 }
 
-export function createMediaBlock({ mediaId = null, file = null } = {}) {
+export function createMediaBlock({ mediaId = null, file = null, layout = 'block' } = {}) {
   return {
     type: 'media',
     key: newBlockKey(),
@@ -25,6 +27,7 @@ export function createMediaBlock({ mediaId = null, file = null } = {}) {
     // Temporary id used in the serialized draft before the file is uploaded
     tempId: file ? newBlockKey() : null,
     file,
+    layout: layout === 'inline' ? 'inline' : 'block',
   };
 }
 
@@ -46,7 +49,9 @@ export function parseEntryContent(plaintext) {
         );
       if (valid) {
         return parsed.map((b) =>
-          b.t === 'text' ? createTextBlock(b.v) : createMediaBlock({ mediaId: b.id })
+          b.t === 'text'
+            ? createTextBlock(b.v)
+            : createMediaBlock({ mediaId: b.id, layout: b.layout })
         );
       }
     } catch (_) {
@@ -66,7 +71,11 @@ export function serializeBlocks(blocks) {
       if (v) out.push({ t: 'text', v });
     } else if (block.type === 'media') {
       const id = block.mediaId || block.tempId;
-      if (id) out.push({ t: 'media', id });
+      if (id) {
+        const item = { t: 'media', id };
+        if (block.layout === 'inline') item.layout = 'inline';
+        out.push(item);
+      }
     }
   }
   return JSON.stringify(out);
