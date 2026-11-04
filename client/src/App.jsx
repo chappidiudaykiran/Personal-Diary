@@ -1,13 +1,25 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext.jsx';
-import Login from './pages/Login.jsx';
-import Register from './pages/Register.jsx';
-import Dashboard from './pages/Dashboard.jsx';
-import NewEntry from './pages/NewEntry.jsx';
-import ViewEntry from './pages/ViewEntry.jsx';
 import LockScreen from './components/LockScreen.jsx';
 import SetPinModal from './components/SetPinModal.jsx';
+
+// Code-split routes so first load is small and repeat loads come from SW cache
+const Login = lazy(() => import('./pages/Login.jsx'));
+const Register = lazy(() => import('./pages/Register.jsx'));
+const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
+const NewEntry = lazy(() => import('./pages/NewEntry.jsx'));
+const ViewEntry = lazy(() => import('./pages/ViewEntry.jsx'));
+
+function RouteLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-app)' }}>
+      <div className="text-sm font-display animate-pulse" style={{ color: 'var(--gold)' }}>
+        Loading…
+      </div>
+    </div>
+  );
+}
 
 // Guard: redirect to login if not authenticated or show lock screen
 const PrivateRoute = ({ children }) => {
@@ -43,15 +55,17 @@ export default function App() {
 
   return (
     <>
-      <Routes>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/login"    element={<PublicRoute><Login /></PublicRoute>} />
-        <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
-        <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-        <Route path="/entry/new" element={<PrivateRoute><NewEntry /></PrivateRoute>} />
-        <Route path="/entry/:id" element={<PrivateRoute><ViewEntry /></PrivateRoute>} />
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
-      </Routes>
+      <Suspense fallback={<RouteLoader />}>
+        <Routes>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/login"    element={<PublicRoute><Login /></PublicRoute>} />
+          <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+          <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+          <Route path="/entry/new" element={<PrivateRoute><NewEntry /></PrivateRoute>} />
+          <Route path="/entry/:id" element={<PrivateRoute><ViewEntry /></PrivateRoute>} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </Suspense>
 
       <SetPinModal
         isOpen={showPinSetup}

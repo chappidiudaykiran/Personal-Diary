@@ -73,13 +73,36 @@ export async function uploadMediaFile(cryptoKey, entryId, file) {
   return data.media;
 }
 
+// In-memory caches — revisits and re-renders are instant, no re-decrypt lag
+const metaCache = new Map();
+const blobCache = new Map();
+
+export function clearMediaCache(mediaId) {
+  if (mediaId) {
+    metaCache.delete(mediaId);
+    const hit = blobCache.get(mediaId);
+    if (hit?.url) { try { URL.revokeObjectURL(hit.url); } catch (_) {} }
+    blobCache.delete(mediaId);
+  } else {
+    metaCache.clear();
+    blobCache.forEach((hit) => { try { URL.revokeObjectURL(hit.url); } catch (_) {} });
+    blobCache.clear();
+  }
+}
+
 export async function listMedia(entryId) {
   const { data } = await apiClient.get(`/media/entries/${entryId}`);
-  return data.media || [];
+  const list = data.media || [];
+  for (const m of list) {
+    if (m?._id && !metaCache.has(m._id)) metaCache.set(m._id, m);
+  }
+  return list;
 }
 
 export async function getMediaMeta(mediaId) {
+  if (metaCache.has(mediaId)) return metaCache.get(mediaId);
   const { data } = await apiClient.get(`/media/${mediaId}`);
+  if (data.media?._id) metaCache.set(mediaId, data.media);
   return data.media;
 }
 
@@ -94,12 +117,16 @@ export async function decryptMediaMeta(cryptoKey, media) {
 
 /** Download ciphertext for one media item, decrypt it, and return an object URL. */
 export async function fetchDecryptedMedia(cryptoKey, mediaWithMeta) {
+  const cached = blobCache.get(mediaWithMeta._id);
+  if (cached?.url) return { ...cached.meta, blob: cached.blob, url: cached.url };
   const { data } = await apiClient.get(`/media/${mediaWithMeta._id}/file`, {
     responseType: 'arraybuffer',
   });
   const plain = await decryptBytes(cryptoKey, new Uint8Array(data), mediaWithMeta.iv);
   const blob = new Blob([plain], { type: mediaWithMeta.mime || 'application/octet-stream' });
-  return { ...mediaWithMeta, blob, url: URL.createObjectURL(blob) };
+  const url = URL.createObjectURL(blob);
+  blobCache.set(mediaWithMeta._id, { meta: mediaWithMeta, blob, url });
+  return { ...mediaWithMeta, blob, url };
 }
 
 export async function deleteMedia(mediaId) {

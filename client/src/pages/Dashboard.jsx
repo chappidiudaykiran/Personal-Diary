@@ -49,41 +49,40 @@ export default function Dashboard() {
         // Stop skeleton loader immediately once entries list is fetched
         setLoading(false);
 
-        // Load cached titles and decrypt missing titles asynchronously
+        // Load cached titles instantly, decrypt missing in one batch (single re-render)
         const titleMap = {};
-        const decryptions = [];
+        const missing = [];
 
         for (const entry of list) {
           const cacheKey = `dec_title_${entry._id}_${entry.updatedAt}`;
           const cached = sessionStorage.getItem(cacheKey);
-
-          if (cached) {
-            titleMap[entry._id] = cached;
-          } else if (cryptoKey) {
-            decryptions.push(
-              decrypt(cryptoKey, entry.encryptedTitle, entry.iv)
-                .then((decrypted) => {
-                  try {
-                    sessionStorage.setItem(cacheKey, decrypted);
-                  } catch (_) {}
-                  if (isMounted) {
-                    setDecryptedTitles((prev) => ({ ...prev, [entry._id]: decrypted }));
-                  }
-                })
-                .catch(() => {
-                  if (isMounted) {
-                    setDecryptedTitles((prev) => ({ ...prev, [entry._id]: 'Untitled Entry' }));
-                  }
-                })
-            );
-          }
+          if (cached) titleMap[entry._id] = cached;
+          else if (cryptoKey) missing.push(entry);
         }
 
-        if (isMounted) {
+        if (isMounted && Object.keys(titleMap).length > 0) {
           setDecryptedTitles((prev) => ({ ...prev, ...titleMap }));
         }
 
-        await Promise.all(decryptions);
+        if (missing.length > 0 && cryptoKey) {
+          const results = await Promise.all(
+            missing.map(async (entry) => {
+              const cacheKey = `dec_title_${entry._id}_${entry.updatedAt}`;
+              try {
+                const decrypted = await decrypt(cryptoKey, entry.encryptedTitle, entry.iv);
+                try { sessionStorage.setItem(cacheKey, decrypted); } catch (_) {}
+                return [entry._id, decrypted];
+              } catch {
+                return [entry._id, 'Untitled Entry'];
+              }
+            })
+          );
+          if (isMounted) {
+            const batch = { ...titleMap };
+            for (const [id, title] of results) batch[id] = title;
+            setDecryptedTitles((prev) => ({ ...prev, ...batch }));
+          }
+        }
       } catch (err) {
         console.error('Fetch entries error:', err);
         if (isMounted) toast.error('Failed to load entries');
