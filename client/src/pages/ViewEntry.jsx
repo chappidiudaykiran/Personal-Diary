@@ -4,6 +4,9 @@ import { ArrowLeft, Pencil, Trash2, Save, X, Cloud, CloudOff, CheckCircle2, Load
 import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar.jsx';
 import MoodPicker, { moodMap } from '../components/MoodPicker.jsx';
+import MediaPicker from '../components/MediaPicker.jsx';
+import MediaGallery from '../components/MediaGallery.jsx';
+import { uploadMediaFile } from '../api/mediaApi.js';
 import apiClient from '../api/apiClient.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { encrypt, decrypt } from '../crypto/cryptoUtils.js';
@@ -41,6 +44,10 @@ export default function ViewEntry() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState([]);
+  const [mediaCount, setMediaCount] = useState(0);
+  const [mediaRefresh, setMediaRefresh] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState('');
 
   // Restore edit draft callback
   const handleRestoreEditDraft = useCallback((draft) => {
@@ -119,13 +126,36 @@ export default function ViewEntry() {
       setInitialTitle(title);
       setInitialContent(content);
       setInitialMood(mood);
+
+      // Encrypt + upload newly added attachments
+      let failedUploads = 0;
+      if (pendingFiles.length > 0) {
+        for (let i = 0; i < pendingFiles.length; i++) {
+          try {
+            setUploadStatus(`Encrypting & uploading ${i + 1} of ${pendingFiles.length}: ${pendingFiles[i].name}`);
+            await uploadMediaFile(cryptoKey, id, pendingFiles[i]);
+          } catch (uploadErr) {
+            failedUploads++;
+            console.error('Media upload failed:', uploadErr);
+          }
+        }
+        setUploadStatus('');
+        setPendingFiles([]);
+        setMediaRefresh((n) => n + 1);
+      }
+
       setEditing(false);
       clearEditDraft();
-      toast.success('Entry updated ✨');
+      if (failedUploads > 0) {
+        toast.error(`Entry updated, but ${failedUploads} attachment${failedUploads === 1 ? '' : 's'} failed to upload`);
+      } else {
+        toast.success('Entry updated ✨');
+      }
     } catch {
       toast.error('Failed to update entry');
     } finally {
       setSaving(false);
+      setUploadStatus('');
     }
   };
 
@@ -147,6 +177,7 @@ export default function ViewEntry() {
     setTitle(initialTitle);
     setContent(initialContent);
     setMood(initialMood);
+    setPendingFiles([]);
     setEditing(false);
     clearEditDraft();
   };
@@ -334,6 +365,39 @@ export default function ViewEntry() {
                 style={{ color: 'var(--text-body)' }}
               >
                 {content}
+              </div>
+            )}
+          </div>
+
+          {/* Attachments (decrypted in-browser) */}
+          <div
+            className="px-6 sm:px-8"
+            style={{ paddingBottom: mediaCount > 0 || editing ? '2rem' : 0 }}
+          >
+            <MediaGallery
+              entryId={id}
+              cryptoKey={cryptoKey}
+              editable={editing}
+              refreshKey={mediaRefresh}
+              onCountChange={setMediaCount}
+            />
+            {editing && (
+              <div className="mt-5">
+                <p className="text-xs uppercase tracking-widest font-medium mb-3" style={{ color: 'var(--text-muted)' }}>
+                  Add Photos &amp; Media
+                </p>
+                <MediaPicker
+                  files={pendingFiles}
+                  onChange={setPendingFiles}
+                  existingCount={mediaCount}
+                  disabled={saving}
+                />
+                {uploadStatus && (
+                  <p className="flex items-center gap-2 text-xs mt-3" style={{ color: 'var(--gold)' }}>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    {uploadStatus}
+                  </p>
+                )}
               </div>
             )}
           </div>

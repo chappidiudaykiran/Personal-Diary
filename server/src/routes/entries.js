@@ -3,6 +3,7 @@ const router = express.Router();
 const { body, param, validationResult } = require('express-validator');
 const { protect } = require('../middleware/auth');
 const Entry = require('../models/Entry');
+const Media = require('../models/Media');
 
 // All entry routes require authentication
 router.use(protect);
@@ -16,6 +17,18 @@ router.get('/', async (req, res) => {
       .select('encryptedTitle iv ivContent mood wordCount createdAt updatedAt')
       .sort({ createdAt: -1 })
       .lean();
+
+    // Attach encrypted-media counts (server cannot know media types — encrypted)
+    if (entries.length > 0) {
+      const counts = await Media.aggregate([
+        { $match: { userId: req.user._id, entryId: { $in: entries.map((e) => e._id) } } },
+        { $group: { _id: '$entryId', count: { $sum: 1 } } },
+      ]);
+      const countMap = new Map(counts.map((c) => [String(c._id), c.count]));
+      entries.forEach((e) => {
+        e.mediaCount = countMap.get(String(e._id)) || 0;
+      });
+    }
 
     res.json({ entries });
   } catch (error) {
@@ -135,6 +148,7 @@ router.delete(
       if (!entry) {
         return res.status(404).json({ message: 'Entry not found' });
       }
+      await Media.deleteMany({ entryId: entry._id, userId: req.user._id });
       res.json({ message: 'Entry deleted' });
     } catch (error) {
       console.error('Delete entry error:', error);

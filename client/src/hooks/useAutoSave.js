@@ -22,6 +22,9 @@ export function useAutoSave({ draftId = 'new_entry', data = {}, onRestore }) {
   const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
 
   const isInitializedRef = useRef(false);
+  // Set by clearDraft() so the unmount/beforeunload save below does not
+  // resurrect a draft that was just saved or discarded.
+  const suppressSaveRef = useRef(false);
   const dataRef = useRef(data);
   dataRef.current = data;
 
@@ -39,6 +42,7 @@ export function useAutoSave({ draftId = 'new_entry', data = {}, onRestore }) {
 
   // Clear draft from storage
   const clearDraft = useCallback(() => {
+    suppressSaveRef.current = true;
     try {
       localStorage.removeItem(storageKey);
       setStatus('idle');
@@ -51,6 +55,7 @@ export function useAutoSave({ draftId = 'new_entry', data = {}, onRestore }) {
 
   // Synchronous save helper
   const saveNow = useCallback((currentData) => {
+    if (suppressSaveRef.current) return;
     const { title, content, mood } = currentData || dataRef.current || {};
     const hasData = Boolean(title?.trim() || content?.trim() || mood);
     if (!hasData) return;
@@ -112,6 +117,8 @@ export function useAutoSave({ draftId = 'new_entry', data = {}, onRestore }) {
       return;
     }
 
+    // Typing new content after a clear re-enables auto-save for that content
+    suppressSaveRef.current = false;
     setStatus('saving');
 
     const timer = setTimeout(() => {

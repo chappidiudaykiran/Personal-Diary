@@ -6,6 +6,7 @@ require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
 const entryRoutes = require('./routes/entries');
+const mediaRoutes = require('./routes/media');
 
 const app = express();
 
@@ -71,6 +72,7 @@ app.use(express.urlencoded({ extended: false }));
 // ─── Routes ───────────────────────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
 app.use('/api/entries', entryRoutes);
+app.use('/api/media', mediaRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

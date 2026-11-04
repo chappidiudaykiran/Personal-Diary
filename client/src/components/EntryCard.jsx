@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { FileText } from 'lucide-react';
+import { FileText, Paperclip } from 'lucide-react';
 import { moodMap } from './MoodPicker.jsx';
 
 function formatDate(date) {
@@ -90,6 +90,12 @@ export default function EntryCard({ entry, decryptedTitle, isDecrypting }) {
               <FileText className="w-3 h-3" />
               {entry.wordCount || 0} {entry.wordCount === 1 ? 'word' : 'words'}
             </span>
+            {entry.mediaCount > 0 && (
+              <span className="flex items-center gap-1" title={`${entry.mediaCount} attachment${entry.mediaCount === 1 ? '' : 's'}`}>
+                <Paperclip className="w-3 h-3" />
+                {entry.mediaCount}
+              </span>
+            )}
             <span>{formatDate(dateObj)}</span>
           </div>
         </div>

@@ -72,6 +72,47 @@ export async function encrypt(key, plaintext) {
 }
 
 /**
+ * Encrypt raw bytes (e.g. a file) using AES-256-GCM.
+ * Returns the ciphertext as bytes so it can be uploaded as binary —
+ * base64-encoding large files would inflate them by ~33%.
+ */
+export async function encryptBytes(key, dataBuffer) {
+  if (!window?.crypto?.subtle) {
+    throw new Error('Web Crypto API is not available.');
+  }
+
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+  const ciphertextBuffer = await window.crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    dataBuffer
+  );
+
+  return {
+    ciphertext: new Uint8Array(ciphertextBuffer),
+    iv: bytesToBase64(iv),
+  };
+}
+
+/**
+ * Decrypt raw bytes encrypted with encryptBytes. Returns a Uint8Array
+ * that can be wrapped in a Blob for display/download.
+ */
+export async function decryptBytes(key, ciphertextBytes, iv) {
+  if (!window?.crypto?.subtle) {
+    throw new Error('Web Crypto API is not available.');
+  }
+
+  const plaintextBuffer = await window.crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: base64ToBytes(iv) },
+    key,
+    ciphertextBytes
+  );
+
+  return new Uint8Array(plaintextBuffer);
+}
+
+/**
  * Decrypt a base64-encoded ciphertext using AES-256-GCM.
  */
 export async function decrypt(key, ciphertext, iv) {

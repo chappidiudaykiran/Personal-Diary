@@ -1,53 +1,36 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, Cloud, CloudOff, CheckCircle2, Loader2, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar.jsx';
 import MoodPicker from '../components/MoodPicker.jsx';
+import MediaPicker from '../components/MediaPicker.jsx';
+import { uploadMediaFile } from '../api/mediaApi.js';
 import apiClient from '../api/apiClient.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { encrypt } from '../crypto/cryptoUtils.js';
-import { useAutoSave } from '../hooks/useAutoSave.js';
 
 export default function NewEntry() {
-  const { cryptoKey } = useAuth();
+  const { cryptoKey, user } = useAuth();
   const navigate = useNavigate();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [mood, setMood] = useState('');
+  const [pendingFiles, setPendingFiles] = useState([]);
+  const [uploadStatus, setUploadStatus] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // Restore draft callback
-  const handleRestore = useCallback((draft) => {
-    if (draft.title) setTitle(draft.title);
-    if (draft.content) setContent(draft.content);
-    if (draft.mood) setMood(draft.mood);
-  }, []);
-
-  // Auto-save hook for new entry
-  const {
-    autoSaveEnabled,
-    toggleAutoSave,
-    status,
-    lastSavedAt,
-    hasRestoredDraft,
-    clearDraft,
-  } = useAutoSave({
-    draftId: 'new_entry',
-    data: { title, content, mood },
-    onRestore: handleRestore,
-  });
+  // New Entry always starts blank — no draft is restored or auto-saved.
+  // Purge any draft left over from the old behaviour so it never comes back.
+  useEffect(() => {
+    try {
+      const userId = user?.id || user?._id || 'guest';
+      localStorage.removeItem(`diary_draft_${userId}_new_entry`);
+    } catch (_) {}
+  }, [user]);
 
   const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
   const charCount = content.length;
-
-  const handleDiscardDraft = () => {
-    setTitle('');
-    setContent('');
-    setMood('');
-    clearDraft();
-    toast.success('Draft cleared');
-  };
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -65,7 +48,7 @@ export default function NewEntry() {
       const { ciphertext: encryptedTitle, iv: titleIv } = await encrypt(cryptoKey, title.trim());
       const { ciphertext: encryptedContent, iv: contentIv } = await encrypt(cryptoKey, content.trim());
 
-      await apiClient.post('/entries', {
+      const { data } = await apiClient.post('/entries', {
         encryptedTitle,
         encryptedContent,
         iv: titleIv,
@@ -74,16 +57,34 @@ export default function NewEntry() {
         wordCount,
       });
 
-      // Clear draft upon successful save
-      clearDraft();
+      // Encrypt + upload attachments one by one (each is encrypted in-browser)
+      const entryId = data.entry?._id;
+      let failedUploads = 0;
+      if (entryId && pendingFiles.length > 0) {
+        for (let i = 0; i < pendingFiles.length; i++) {
+          try {
+            setUploadStatus(`Encrypting & uploading ${i + 1} of ${pendingFiles.length}: ${pendingFiles[i].name}`);
+            await uploadMediaFile(cryptoKey, entryId, pendingFiles[i]);
+          } catch (uploadErr) {
+            failedUploads++;
+            console.error('Media upload failed:', uploadErr);
+          }
+        }
+        setUploadStatus('');
+      }
 
-      toast.success('Entry saved ✨');
-      navigate('/dashboard');
+      if (failedUploads > 0) {
+        toast.error(`Entry saved, but ${failedUploads} attachment${failedUploads === 1 ? '' : 's'} failed to upload`);
+      } else {
+        toast.success('Entry saved ✨');
+      }
+      navigate(entryId ? `/entry/${entryId}` : '/dashboard');
     } catch (err) {
       toast.error('Failed to save entry. Please try again.');
       console.error(err);
     } finally {
       setSaving(false);
+      setUploadStatus('');
     }
   };
 
@@ -126,84 +127,15 @@ export default function NewEntry() {
               style={{ background: 'linear-gradient(90deg, transparent, var(--gold), transparent)' }}
             />
 
-            {/* Date header & Auto-Save status toggle */}
+            {/* Date header */}
             <div
-              className="px-6 sm:px-8 pt-6 pb-4 flex flex-wrap items-center justify-between gap-3"
+              className="px-6 sm:px-8 pt-6 pb-4"
               style={{ borderBottom: '1px solid var(--border-color)' }}
             >
               <p className="text-xs uppercase tracking-widest font-medium" style={{ color: 'var(--text-muted)' }}>
                 {dateLabel}
               </p>
-
-              {/* Auto-Save Controls */}
-              <button
-                type="button"
-                onClick={toggleAutoSave}
-                title={autoSaveEnabled ? "Click to disable auto-save" : "Click to enable auto-save"}
-                className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer"
-                style={{
-                  background: autoSaveEnabled ? 'rgba(196, 145, 58, 0.12)' : 'var(--bg-elevated)',
-                  border: '1px solid var(--border-color)',
-                  color: autoSaveEnabled ? 'var(--gold)' : 'var(--text-muted)',
-                }}
-              >
-                {status === 'saving' ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Saving draft...</span>
-                  </>
-                ) : status === 'saved' || status === 'restored' ? (
-                  <>
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>
-                      Auto-saved{' '}
-                      {lastSavedAt
-                        ? lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                        : ''}
-                    </span>
-                  </>
-                ) : !autoSaveEnabled ? (
-                  <>
-                    <CloudOff className="w-3.5 h-3.5" />
-                    <span>Auto-save Off</span>
-                  </>
-                ) : (
-                  <>
-                    <Cloud className="w-3.5 h-3.5" />
-                    <span>Auto-save On</span>
-                  </>
-                )}
-              </button>
             </div>
-
-            {/* Restored Draft Banner */}
-            {hasRestoredDraft && (
-              <div
-                className="px-6 sm:px-8 py-2.5 flex items-center justify-between text-xs transition-all"
-                style={{
-                  background: 'rgba(196,145,58,0.12)',
-                  borderBottom: '1px solid var(--border-color)',
-                  color: 'var(--text-primary)',
-                }}
-              >
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-3.5 h-3.5" style={{ color: 'var(--gold)' }} />
-                  <span>
-                    Restored unsaved draft{' '}
-                    {lastSavedAt && `from ${lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleDiscardDraft}
-                  className="flex items-center gap-1 transition-colors hover:underline cursor-pointer"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  Discard draft
-                </button>
-              </div>
-            )}
 
             {/* Title input */}
             <div className="px-6 sm:px-8 pt-6 pb-2">
@@ -244,6 +176,20 @@ export default function NewEntry() {
               className="px-6 sm:px-8 py-5 mt-4 space-y-5"
               style={{ borderTop: '1px solid var(--border-color)' }}
             >
+              {/* Photos & media */}
+              <div>
+                <p className="text-xs uppercase tracking-widest font-medium mb-3" style={{ color: 'var(--text-muted)' }}>
+                  Photos &amp; Media
+                </p>
+                <MediaPicker files={pendingFiles} onChange={setPendingFiles} disabled={saving} />
+                {uploadStatus && (
+                  <p className="flex items-center gap-2 text-xs mt-3" style={{ color: 'var(--gold)' }}>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    {uploadStatus}
+                  </p>
+                )}
+              </div>
+
               {/* Mood */}
               <div>
                 <p className="text-xs uppercase tracking-widest font-medium mb-3" style={{ color: 'var(--text-muted)' }}>

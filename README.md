@@ -75,10 +75,12 @@ Personal Diary/
 │   │   ├── config/db.js          # MongoDB connection
 │   │   ├── models/
 │   │   │   ├── User.js           # User (stores encSalt for key derivation)
-│   │   │   └── Entry.js          # Entry (only stores ciphertext, IVs)
+│   │   │   ├── Entry.js          # Entry (only stores ciphertext, IVs)
+│   │   │   └── Media.js          # Attachment (only stores encrypted bytes + encrypted name/type)
 │   │   ├── routes/
 │   │   │   ├── auth.js           # Register, Login, Refresh, Logout
-│   │   │   └── entries.js        # CRUD for encrypted diary entries
+│   │   │   ├── entries.js        # CRUD for encrypted diary entries (+ mediaCount)
+│   │   │   └── media.js          # Upload/list/download/delete encrypted attachments
 │   │   ├── middleware/auth.js    # JWT protection
 │   │   └── app.js               # Express setup
 │   ├── index.js                  # Entry point
@@ -98,7 +100,9 @@ Personal Diary/
     │   └── components/
     │       ├── Navbar.jsx
     │       ├── EntryCard.jsx
-    │       └── MoodPicker.jsx
+    │       ├── MoodPicker.jsx
+    │       ├── MediaPicker.jsx   # Pick/drop files (stay local until save)
+    │       └── MediaGallery.jsx  # Decrypt-on-device gallery + lightbox
     └── .env
 ```
 
@@ -152,7 +156,8 @@ You'll see something like:
 ## ✨ Features
 
 - 📝 Write, edit, delete diary entries
-- 🔐 AES-256-GCM encryption (browser-side, zero-knowledge)
+- 📸 Attach photos, videos, audio & documents (up to 10 files/entry, 10 MB each) — gallery with lightbox, in-browser decrypted previews, download & delete
+- 🔐 AES-256-GCM encryption (browser-side, zero-knowledge) — media files, filenames, and file types are encrypted before upload and stored as ciphertext in MongoDB; the server never sees them
 - 😊 Mood tracking (Happy, Sad, Excited, Grateful, etc.)
 - 🔍 Search entries by title
 - 🎨 Beautiful amber/warm UI
