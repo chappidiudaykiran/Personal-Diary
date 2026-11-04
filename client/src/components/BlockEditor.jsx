@@ -188,75 +188,100 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
     window.addEventListener('touchmove', onMove, { passive: false }); window.addEventListener('touchend', onUp);
   };
 
+  // Group media + immediate next text so typing continues on right side by default.
+  // Next standalone text blocks render full-width below the image.
+  const rendered = [];
+  for (let i = 0; i < blocks.length; i++) {
+    const block = blocks[i];
+    if (block.type === 'text') {
+      rendered.push(
+        <AutoTextarea
+          key={block.key}
+          blockKey={block.key}
+          value={block.text}
+          disabled={disabled}
+          first={i === 0}
+          placeholder={i === 0 ? 'Write freely. This is your safe space.' : 'Continue writing…'}
+          onCursor={handleCursor}
+          onChange={(text) => { const next = [...blocks]; next[i] = { ...block, text }; onChange(next); }}
+        />
+      );
+      continue;
+    }
+    const width = clampAsideWidth(block.width ?? 38);
+    const isSelected = selectedKey === block.key;
+    const nextBlock = i + 1 < blocks.length ? blocks[i + 1] : null;
+    const hasNextText = nextBlock && nextBlock.type === 'text';
+    const nextIndex = i + 1;
+
+    const mediaBox = (
+      <div
+        id={`media-box-${block.key}`}
+        onDoubleClick={(e) => { e.stopPropagation(); setSelectedKey(block.key); }}
+        onClick={(e) => { e.stopPropagation(); setSelectedKey(block.key); }}
+        className={`relative flex-shrink-0 self-start ${isSelected ? 'ring-2 ring-amber-400' : ''} rounded-xl`}
+        style={{ width: `${width}%`, minWidth: '90px', maxWidth: '100%', touchAction: 'none' }}
+      >
+        {block.file ? <AsideFilePreview file={block.file} /> : block.mediaId ? <InlineMedia cryptoKey={cryptoKey} mediaId={block.mediaId} width={width} /> : null}
+        {isSelected && !disabled && (
+          <>
+            {[
+              { pos: 'top-1/2 -left-1.5 -translate-y-1/2', cursor: 'cursor-ew-resize', h: 'l' },
+              { pos: 'top-1/2 -right-1.5 -translate-y-1/2', cursor: 'cursor-ew-resize', h: 'r' },
+              { pos: 'left-1/2 -top-1.5 -translate-x-1/2', cursor: 'cursor-ns-resize', h: 't' },
+              { pos: 'left-1/2 -bottom-1.5 -translate-x-1/2', cursor: 'cursor-ns-resize', h: 'b' },
+              { pos: '-top-1.5 -left-1.5', cursor: 'cursor-nwse-resize', h: 'tl' },
+              { pos: '-top-1.5 -right-1.5', cursor: 'cursor-nesw-resize', h: 'tr' },
+              { pos: '-bottom-1.5 -left-1.5', cursor: 'cursor-nesw-resize', h: 'bl' },
+              { pos: '-bottom-1.5 -right-1.5', cursor: 'cursor-nwse-resize', h: 'br' },
+            ].map((hd) => (
+              <div
+                key={hd.h}
+                onMouseDown={(e) => handleDragStart(e, i, hd.h)}
+                onTouchStart={(e) => handleDragStart(e, i, hd.h)}
+                className={`absolute ${hd.pos} w-3 h-3 bg-white border-2 rounded-full ${hd.cursor} touch-none select-none`}
+                style={{ borderColor: 'var(--gold)', boxShadow: '0 1px 4px rgba(0,0,0,0.3)' }}
+              />
+            ))}
+          </>
+        )}
+      </div>
+    );
+
+    rendered.push(
+      <div key={block.key} data-media-block className="relative my-2">
+        <div className="flex items-start gap-3">
+          {mediaBox}
+          {hasNextText ? (
+            <div className="flex-1 min-w-0">
+              <AutoTextarea
+                key={nextBlock.key}
+                blockKey={nextBlock.key}
+                value={nextBlock.text}
+                disabled={disabled}
+                first={false}
+                placeholder="Continue writing…"
+                onCursor={handleCursor}
+                onChange={(text) => { const next = [...blocks]; next[nextIndex] = { ...nextBlock, text }; onChange(next); }}
+              />
+            </div>
+          ) : null}
+        </div>
+        {isSelected && !disabled && (
+          <div className="absolute top-1 right-1 flex items-center gap-1 z-10">
+            <button type="button" onClick={() => moveBlock(i, -1)} disabled={i === 0} className="w-7 h-7 rounded-full flex items-center justify-center cursor-pointer disabled:opacity-30" style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}><ChevronUp className="w-4 h-4" /></button>
+            <button type="button" onClick={() => moveBlock(i, 1)} disabled={i >= blocks.length - 1} className="w-7 h-7 rounded-full flex items-center justify-center cursor-pointer disabled:opacity-30" style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}><ChevronDown className="w-4 h-4" /></button>
+            <button type="button" onClick={() => removeBlock(i)} className="w-7 h-7 rounded-full flex items-center justify-center cursor-pointer" style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}><X className="w-4 h-4" /></button>
+          </div>
+        )}
+      </div>
+    );
+    if (hasNextText) i++;
+  }
+
   return (
     <div className="flex flex-col min-h-full">
-      <div className="flex-1">
-        {blocks.map((block, index) => {
-          if (block.type === 'text') {
-            return (
-              <AutoTextarea
-                key={block.key}
-                blockKey={block.key}
-                value={block.text}
-                disabled={disabled}
-                first={index === 0}
-                placeholder={index === 0 ? 'Write freely. This is your safe space.' : 'Continue writing…'}
-                onCursor={handleCursor}
-                onChange={(text) => { const next = [...blocks]; next[index] = { ...block, text }; onChange(next); }}
-              />
-            );
-          }
-          const width = clampAsideWidth(block.width ?? 38);
-          const isSelected = selectedKey === block.key;
-          return (
-            <div key={block.key} data-media-block className="relative my-3 group" style={{ display: 'block' }}>
-              {/* Simple image container - no yellow box, no placeholder text */}
-              <div
-                id={`media-box-${block.key}`}
-                onDoubleClick={(e) => { e.stopPropagation(); setSelectedKey(block.key); }}
-                onClick={(e) => { e.stopPropagation(); /* single click also selects on mobile */ setSelectedKey(block.key); }}
-                className={`relative inline-block align-top ${isSelected ? 'ring-2 ring-amber-400' : ''} rounded-xl`}
-                style={{ width: `${width}%`, minWidth: '90px', maxWidth: '100%', touchAction: 'none' }}
-              >
-                {block.file ? <AsideFilePreview file={block.file} /> : block.mediaId ? <InlineMedia cryptoKey={cryptoKey} mediaId={block.mediaId} width={width} /> : null}
-                {/* Resize handles - only when selected (double-click) */}
-                {isSelected && !disabled && (
-                  <>
-                    {/* 8 handles: corners + mid sides */}
-                    {[
-                      { pos: 'top-1/2 -left-1.5 -translate-y-1/2', cursor: 'cursor-ew-resize', h: 'l' },
-                      { pos: 'top-1/2 -right-1.5 -translate-y-1/2', cursor: 'cursor-ew-resize', h: 'r' },
-                      { pos: 'left-1/2 -top-1.5 -translate-x-1/2', cursor: 'cursor-ns-resize', h: 't' },
-                      { pos: 'left-1/2 -bottom-1.5 -translate-x-1/2', cursor: 'cursor-ns-resize', h: 'b' },
-                      { pos: '-top-1.5 -left-1.5', cursor: 'cursor-nwse-resize', h: 'tl' },
-                      { pos: '-top-1.5 -right-1.5', cursor: 'cursor-nesw-resize', h: 'tr' },
-                      { pos: '-bottom-1.5 -left-1.5', cursor: 'cursor-nesw-resize', h: 'bl' },
-                      { pos: '-bottom-1.5 -right-1.5', cursor: 'cursor-nwse-resize', h: 'br' },
-                    ].map((hd) => (
-                      <div
-                        key={hd.h}
-                        onMouseDown={(e) => handleDragStart(e, index, hd.h)}
-                        onTouchStart={(e) => handleDragStart(e, index, hd.h)}
-                        className={`absolute ${hd.pos} w-3 h-3 bg-white border-2 rounded-full ${hd.cursor} touch-none select-none`}
-                        style={{ borderColor: 'var(--gold)', boxShadow: '0 1px 4px rgba(0,0,0,0.3)' }}
-                      />
-                    ))}
-                  </>
-                )}
-              </div>
-
-              {/* Minimal actions - only show when selected, floating top-right */}
-              {isSelected && !disabled && (
-                <div className="absolute top-1 right-1 flex items-center gap-1 z-10">
-                  <button type="button" onClick={() => moveBlock(index, -1)} disabled={index === 0} className="w-7 h-7 rounded-full flex items-center justify-center cursor-pointer disabled:opacity-30" style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}><ChevronUp className="w-4 h-4" /></button>
-                  <button type="button" onClick={() => moveBlock(index, 1)} disabled={index === blocks.length - 1} className="w-7 h-7 rounded-full flex items-center justify-center cursor-pointer disabled:opacity-30" style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}><ChevronDown className="w-4 h-4" /></button>
-                  <button type="button" onClick={() => removeBlock(index)} className="w-7 h-7 rounded-full flex items-center justify-center cursor-pointer" style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}><X className="w-4 h-4" /></button>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+      <div className="flex-1">{rendered}</div>
 
       <div className="sticky bottom-0 mt-3 flex items-center gap-2 rounded-xl px-2 py-2" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', boxShadow: '0 -4px 16px rgba(0,0,0,0.12)' }}>
         <button type="button" disabled={disabled} onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #c4913a, #dba84a)', color: '#0c0c17' }}><ImagePlus className="w-4 h-4" />Media</button>
