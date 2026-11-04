@@ -2,9 +2,11 @@
 // paragraphs, e.g. text -> photo -> text -> video.
 // The whole list is JSON-stringified and then encrypted like the old
 // plain-text content, so the server format does not change.
-// Serialized shape: [{ "t": "text", "v": "..." }, { "t": "media", "id": "<mediaId>", "layout": "inline" }]
-// Media layout: "inline" = text continues after it on the same line,
+// Serialized shape: [{ "t": "text", "v": "..." }, { "t": "media", "id": "<mediaId>", "layout": "aside", "w": 38 }]
+// Media layout: "aside" = media beside text on the right side (flex row),
+//   width controls how wide the media column is (20-60%).
 // "block" (default) = full-width media with text below it.
+// "inline" is legacy alias for "aside" kept for backwards compat.
 // Legacy entries (plain text, not JSON) load as a single text block.
 
 let counter = 0;
@@ -19,7 +21,23 @@ export function createTextBlock(text = '') {
   return { type: 'text', key: newBlockKey(), text };
 }
 
-export function createMediaBlock({ mediaId = null, file = null, layout = 'block' } = {}) {
+const DEFAULT_ASIDE_WIDTH = 38;
+const MIN_ASIDE_WIDTH = 22;
+const MAX_ASIDE_WIDTH = 60;
+
+export function clampAsideWidth(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return DEFAULT_ASIDE_WIDTH;
+  return Math.min(MAX_ASIDE_WIDTH, Math.max(MIN_ASIDE_WIDTH, Math.round(n)));
+}
+
+export function normalizeLayout(layout) {
+  if (layout === 'aside' || layout === 'inline') return 'aside';
+  return 'block';
+}
+
+export function createMediaBlock({ mediaId = null, file = null, layout = 'block', width } = {}) {
+  const normalized = normalizeLayout(layout);
   return {
     type: 'media',
     key: newBlockKey(),
@@ -27,7 +45,8 @@ export function createMediaBlock({ mediaId = null, file = null, layout = 'block'
     // Temporary id used in the serialized draft before the file is uploaded
     tempId: file ? newBlockKey() : null,
     file,
-    layout: layout === 'inline' ? 'inline' : 'block',
+    layout: normalized,
+    width: normalized === 'aside' ? clampAsideWidth(width ?? DEFAULT_ASIDE_WIDTH) : undefined,
   };
 }
 
@@ -51,7 +70,7 @@ export function parseEntryContent(plaintext) {
         return parsed.map((b) =>
           b.t === 'text'
             ? createTextBlock(b.v)
-            : createMediaBlock({ mediaId: b.id, layout: b.layout })
+            : createMediaBlock({ mediaId: b.id, layout: b.layout, width: b.w ?? b.width })
         );
       }
     } catch (_) {
@@ -72,8 +91,12 @@ export function serializeBlocks(blocks) {
     } else if (block.type === 'media') {
       const id = block.mediaId || block.tempId;
       if (id) {
+        const layout = normalizeLayout(block.layout);
         const item = { t: 'media', id };
-        if (block.layout === 'inline') item.layout = 'inline';
+        if (layout === 'aside') {
+          item.layout = 'aside';
+          item.w = clampAsideWidth(block.width);
+        }
         out.push(item);
       }
     }

@@ -7,15 +7,19 @@ import {
   downloadObjectUrl,
   formatFileSize,
 } from '../api/mediaApi.js';
+import { clampAsideWidth, normalizeLayout } from '../utils/entryBlocks.js';
 
 /**
  * Renders one saved media item.
  * layout="block": full-width, text goes below it.
- * layout="inline": flows inside the sentence, text continues after it.
+ * layout="aside": media sits beside text on the right side (flex row, not inline).
+ *   Parent controls width; `width` is % of row.
  * Bytes arrive as ciphertext and are decrypted into an in-memory Blob URL.
  */
-export function InlineMedia({ cryptoKey, mediaId, layout = 'block' }) {
-  const inline = layout === 'inline';
+export function InlineMedia({ cryptoKey, mediaId, layout = 'block', width = 38 }) {
+  const normalized = normalizeLayout(layout);
+  const isAside = normalized === 'aside';
+  const w = clampAsideWidth(width);
   const [media, setMedia] = useState(null);
   const [error, setError] = useState('');
   const [downloading, setDownloading] = useState(false);
@@ -73,14 +77,14 @@ export function InlineMedia({ cryptoKey, mediaId, layout = 'block' }) {
   };
 
   if (error) {
-    if (inline) {
+    if (isAside) {
       return (
-        <span
-          className="inline-flex items-center rounded-lg px-2 py-1 text-[11px] align-middle mx-1"
+        <div
+          className="rounded-xl px-3 py-4 text-center text-xs w-full"
           style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: '#e05555' }}
         >
           {error}
-        </span>
+        </div>
       );
     }
     return (
@@ -94,14 +98,14 @@ export function InlineMedia({ cryptoKey, mediaId, layout = 'block' }) {
   }
 
   if (!media || ((media.kind === 'image' || media.kind === 'video' || media.kind === 'audio') && !media.url)) {
-    if (inline) {
+    if (isAside) {
       return (
-        <span
-          className="inline-flex items-center justify-center rounded-lg align-middle mx-1 h-24 w-36"
+        <div
+          className="rounded-xl h-36 flex items-center justify-center w-full"
           style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)' }}
         >
-          <Loader2 className="w-4 h-4 animate-spin" style={{ color: 'var(--text-ghost)' }} />
-        </span>
+          <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--text-ghost)' }} />
+        </div>
       );
     }
     return (
@@ -114,60 +118,77 @@ export function InlineMedia({ cryptoKey, mediaId, layout = 'block' }) {
     );
   }
 
-  if (inline) {
+  // ── Aside: compact, fills parent width (parent flex controls %)
+  if (isAside) {
     if (media.kind === 'image') {
       return (
-        <img
-          src={media.url}
-          alt={media.name}
-          title={media.name}
-          className="inline-block h-28 sm:h-36 w-auto max-w-[75%] object-cover rounded-lg align-middle mx-1 my-1"
-          style={{ border: '1px solid var(--border-color)' }}
-          loading="lazy"
-        />
+        <figure className="m-0 w-full">
+          <img
+            src={media.url}
+            alt={media.name}
+            className="w-full object-contain rounded-xl"
+            style={{ maxHeight: '42vh', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)' }}
+            loading="lazy"
+          />
+          <figcaption className="text-[11px] mt-1 truncate" style={{ color: 'var(--text-ghost)' }}>
+            {media.name}
+          </figcaption>
+        </figure>
       );
     }
     if (media.kind === 'video') {
       return (
-        <video
-          src={media.url}
-          controls
-          playsInline
-          preload="metadata"
-          title={media.name}
-          className="inline-block w-60 max-w-[85%] rounded-lg align-middle mx-1 my-1"
-          style={{ background: '#000', border: '1px solid var(--border-color)' }}
-        />
+        <figure className="m-0 w-full">
+          <video
+            src={media.url}
+            controls
+            playsInline
+            preload="metadata"
+            className="w-full rounded-xl"
+            style={{ maxHeight: '42vh', background: '#000', border: '1px solid var(--border-color)' }}
+          />
+          <figcaption className="text-[11px] mt-1 truncate" style={{ color: 'var(--text-ghost)' }}>
+            {media.name}
+          </figcaption>
+        </figure>
       );
     }
     if (media.kind === 'audio') {
       return (
-        <span
-          className="inline-flex items-center gap-2 rounded-lg px-2 py-1 align-middle mx-1"
+        <div
+          className="flex items-center gap-2 rounded-xl px-2 py-2 w-full"
           style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)' }}
-          title={media.name}
         >
           <FileAudio className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--gold)' }} />
-          <audio controls src={media.url} className="h-8 w-48 max-w-[60vw]" />
-        </span>
+          <span className="text-xs truncate flex-1" style={{ color: 'var(--text-muted)' }}>{media.name}</span>
+          <audio controls src={media.url} className="h-7 w-28" />
+        </div>
       );
     }
+    // doc / file
     return (
-      <button
-        type="button"
-        onClick={handleDownload}
-        disabled={downloading}
-        title={media.name}
-        className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] align-middle mx-1 cursor-pointer disabled:opacity-50"
-        style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-bright)', color: 'var(--gold)' }}
+      <div
+        className="flex items-center gap-2 rounded-xl px-2 py-2 w-full"
+        style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)' }}
       >
-        {downloading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
-        <span className="max-w-[140px] truncate">{media.name}</span>
-        <Download className="w-3 h-3" />
-      </button>
+        <FileText className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--gold)' }} />
+        <span className="text-xs truncate flex-1" style={{ color: 'var(--text-muted)' }}>
+          {media.name} · {formatFileSize(Math.max(0, (media.size || 0) - 16))}
+        </span>
+        <button
+          type="button"
+          onClick={handleDownload}
+          disabled={downloading}
+          className="flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-lg cursor-pointer disabled:opacity-50 flex-shrink-0"
+          style={{ background: 'var(--gold-glow)', border: '1px solid var(--border-bright)', color: 'var(--gold)' }}
+        >
+          {downloading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+        </button>
+      </div>
     );
   }
 
+  // ── Block: full-width below text
   if (media.kind === 'image') {
     return (
       <figure className="my-3">
@@ -242,9 +263,9 @@ export function InlineMedia({ cryptoKey, mediaId, layout = 'block' }) {
 
 /**
  * Read-only rendering of an entry's blocks.
- * "inline" media flows inside the current paragraph (text continues after
- * it on the same line); "block" media breaks the paragraph and sits
- * full-width with the text below it.
+ * "aside" media sits beside text on the right side (flex row) with adjustable width,
+ * not inline inside the sentence. "block" media breaks the paragraph and sits
+ * full-width with the text below it. Stacks vertically on mobile.
  */
 export default function EntryContent({ blocks, cryptoKey }) {
   const nodes = [];
@@ -265,16 +286,47 @@ export default function EntryContent({ blocks, cryptoKey }) {
     flow = [];
   };
 
-  for (const block of blocks || []) {
+  // Walk blocks sequentially; aside media is rendered as a flex row
+  // where the accumulated text sits on the left and media on the right.
+  // Width of media column is controlled per-block via `width` %.
+  for (let i = 0; i < (blocks || []).length; i++) {
+    const block = blocks[i];
     if (block.type === 'text') {
       if (block.text?.trim()) {
         flow.push(<span key={block.key}>{block.text}</span>);
       }
     } else if (block.type === 'media' && block.mediaId) {
-      if (block.layout === 'inline') {
-        flow.push(
-          <InlineMedia key={block.key} cryptoKey={cryptoKey} mediaId={block.mediaId} layout="inline" />
+      const layout = normalizeLayout(block.layout);
+      if (layout === 'aside') {
+        const width = clampAsideWidth(block.width);
+        // Pull next text block into same row if adjacent, so both before & after text sit beside media
+        let extraFlow = [];
+        if (i + 1 < blocks.length && blocks[i + 1].type === 'text' && blocks[i + 1].text?.trim()) {
+          extraFlow = [<span key={blocks[i + 1].key}>{blocks[i + 1].text}</span>];
+          i++;
+        }
+        const leftContent = [...flow, ...extraFlow];
+        // If no text at all, still render media full-width constrained to aside width but left side empty hint
+        nodes.push(
+          <div
+            key={`aside-${block.key}`}
+            className="flex flex-col sm:flex-row gap-4 my-3 items-start"
+          >
+            <div
+              className="flex-1 min-w-0 font-sans text-sm sm:text-base leading-[1.95] whitespace-pre-wrap"
+              style={{ color: 'var(--text-body)' }}
+            >
+              {leftContent.length > 0 ? leftContent : <span style={{ color: 'var(--text-ghost)' }} className="text-xs italic">—</span>}
+            </div>
+            <div
+              className="flex-shrink-0 w-full sm:w-auto self-stretch sm:self-start"
+              style={{ width: `min(${width}%, 100%)`, maxWidth: isFinite(width) ? `${width}%` : '38%', minWidth: '140px' }}
+            >
+              <InlineMedia cryptoKey={cryptoKey} mediaId={block.mediaId} layout="aside" width={width} />
+            </div>
+          </div>
         );
+        flow = [];
       } else {
         flushFlow();
         nodes.push(

@@ -20,7 +20,7 @@ import {
   formatFileSize,
 } from '../api/mediaApi.js';
 import { InlineMedia } from './InlineMedia.jsx';
-import { createTextBlock, createMediaBlock } from '../utils/entryBlocks.js';
+import { createTextBlock, createMediaBlock, clampAsideWidth, normalizeLayout } from '../utils/entryBlocks.js';
 
 function AutoTextarea({ blockKey, value, onChange, onCursor, placeholder, disabled, first }) {
   const ref = useRef(null);
@@ -57,10 +57,11 @@ function AutoTextarea({ blockKey, value, onChange, onCursor, placeholder, disabl
   );
 }
 
-function PendingMediaPreview({ file, layout = 'block' }) {
+function PendingMediaPreview({ file, layout = 'block', width = 38 }) {
   const [url, setUrl] = useState(null);
   const kind = kindFromMime(file.type, file.name);
-  const inline = layout === 'inline';
+  const isAside = normalizeLayout(layout) === 'aside';
+  const w = clampAsideWidth(width);
 
   useEffect(() => {
     if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
@@ -72,23 +73,51 @@ function PendingMediaPreview({ file, layout = 'block' }) {
   }, [file]);
 
   if (kind === 'image' && url) {
-    return inline ? (
-      <img src={url} alt={file.name} className="h-32 w-auto max-w-[85%] object-cover rounded-lg" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)' }} />
-    ) : (
+    if (isAside) {
+      return (
+        <div className="flex flex-col sm:flex-row gap-3 items-stretch">
+          <div
+            className="flex-1 min-w-0 rounded-lg px-3 py-6 flex items-center justify-center text-xs"
+            style={{ background: 'var(--bg-elevated)', border: '1px dashed var(--border-color)', color: 'var(--text-ghost)' }}
+          >
+            Text will appear here — media sits on the right
+          </div>
+          <img
+            src={url}
+            alt={file.name}
+            className="rounded-lg object-cover flex-shrink-0 self-start"
+            style={{ width: `${w}%`, maxWidth: '60%', minWidth: '120px', maxHeight: '220px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)' }}
+          />
+        </div>
+      );
+    }
+    return (
       <img src={url} alt={file.name} className="w-full max-h-[50vh] object-contain rounded-xl" style={{ background: 'var(--bg-elevated)' }} />
     );
   }
   if (kind === 'video' && url) {
-    return inline ? (
-      <video src={url} controls playsInline className="w-60 max-w-[85%] rounded-lg" style={{ background: '#000' }} />
-    ) : (
+    if (isAside) {
+      return (
+        <div className="flex flex-col sm:flex-row gap-3 items-stretch">
+          <div
+            className="flex-1 min-w-0 rounded-lg px-3 py-6 flex items-center justify-center text-xs"
+            style={{ background: 'var(--bg-elevated)', border: '1px dashed var(--border-color)', color: 'var(--text-ghost)' }}
+          >
+            Text on left — video on right
+          </div>
+          <video src={url} controls playsInline className="rounded-lg flex-shrink-0 self-start" style={{ width: `${w}%`, maxWidth: '60%', minWidth: '140px', background: '#000', border: '1px solid var(--border-color)' }} />
+        </div>
+      );
+    }
+    return (
       <video src={url} controls playsInline className="w-full max-h-[50vh] rounded-xl" style={{ background: '#000' }} />
     );
   }
+  // non-previewable (audio / docs) – same for both but hint layout
   return (
     <div
       className="flex items-center gap-3 rounded-xl px-3 py-3"
-      style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)' }}
+      style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', maxWidth: isAside ? `${w}%` : '100%', marginLeft: isAside ? 'auto' : 0 }}
     >
       {kind === 'audio' ? (
         <FileAudio className="w-5 h-5 flex-shrink-0" style={{ color: 'var(--gold)' }} />
@@ -221,7 +250,19 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
 
   const setBlockLayout = (index, layout) => {
     const next = [...blocks];
-    next[index] = { ...next[index], layout };
+    const normalized = normalizeLayout(layout);
+    const current = next[index];
+    next[index] = {
+      ...current,
+      layout: normalized,
+      width: normalized === 'aside' ? clampAsideWidth(current.width ?? 38) : undefined,
+    };
+    onChange(next);
+  };
+
+  const setBlockWidth = (index, width) => {
+    const next = [...blocks];
+    next[index] = { ...next[index], width: clampAsideWidth(width) };
     onChange(next);
   };
 
@@ -257,28 +298,30 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
           }
 
           // Media block (saved or pending)
-          const layout = block.layout === 'inline' ? 'inline' : 'block';
+          const layout = normalizeLayout(block.layout);
+          const isAside = layout === 'aside';
+          const width = clampAsideWidth(block.width ?? 38);
           return (
-            <div key={block.key} className="relative group my-2">
+            <div key={block.key} className="relative group my-3 rounded-xl p-2" style={{ border: isAside ? '1px dashed var(--border-color)' : '1px solid transparent', background: isAside ? 'var(--bg-elevated)' : 'transparent' }}>
               {block.file ? (
-                <PendingMediaPreview file={block.file} layout={layout} />
+                <PendingMediaPreview file={block.file} layout={layout} width={width} />
               ) : block.mediaId ? (
-                <InlineMedia cryptoKey={cryptoKey} mediaId={block.mediaId} layout={layout} />
+                <InlineMedia cryptoKey={cryptoKey} mediaId={block.mediaId} layout={layout} width={width} />
               ) : null}
 
-              {/* Layout: text after it on the same line, or below it */}
+              {/* Layout: beside on right side vs below */}
               {!disabled && (
-                <div className="flex items-center gap-2 mt-1.5">
+                <div className="flex flex-wrap items-center gap-2 mt-2">
                   <span className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--text-ghost)' }}>
-                    Text
+                    Layout
                   </span>
                   <div
                     className="flex rounded-full overflow-hidden"
                     style={{ border: '1px solid var(--border-color)' }}
                   >
                     {[
-                      { value: 'inline', label: 'After it (same line)' },
-                      { value: 'block', label: 'Below it' },
+                      { value: 'aside', label: 'Beside text (right side)' },
+                      { value: 'block', label: 'Below text' },
                     ].map((option) => (
                       <button
                         key={option.value}
@@ -295,6 +338,25 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
                       </button>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* Width slider – only when beside/right side */}
+              {!disabled && isAside && (
+                <div className="flex items-center gap-3 mt-2">
+                  <span className="text-[10px] uppercase tracking-wide flex-shrink-0" style={{ color: 'var(--text-ghost)' }}>
+                    Size
+                  </span>
+                  <input
+                    type="range"
+                    min={22}
+                    max={60}
+                    value={width}
+                    onChange={(e) => setBlockWidth(index, Number(e.target.value))}
+                    className="flex-1 h-1.5 appearance-none rounded-full cursor-pointer"
+                    style={{ accentColor: 'var(--gold)', background: 'var(--border-color)' }}
+                  />
+                  <span className="text-[11px] font-medium w-8 text-right flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{width}%</span>
                 </div>
               )}
 
