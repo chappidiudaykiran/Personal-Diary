@@ -13,8 +13,10 @@ import { clampAsideWidth } from '../utils/entryBlocks.js';
  * Renders one saved media item.
  * Media is wrapping by default: used inside a flex row where parent controls width (%).
  * Bytes arrive as ciphertext and are decrypted into an in-memory Blob URL.
+ * Pass `meta` when the caller already has it (e.g. from listMedia) to skip
+ * a redundant GET /media/:id round trip per item.
  */
-export function InlineMedia({ cryptoKey, mediaId, layout = 'aside', width = 38 }) {
+export function InlineMedia({ cryptoKey, mediaId, layout = 'aside', width = 38, meta = null }) {
   const w = clampAsideWidth(width);
   const [media, setMedia] = useState(null);
   const [error, setError] = useState('');
@@ -26,8 +28,8 @@ export function InlineMedia({ cryptoKey, mediaId, layout = 'aside', width = 38 }
     const load = async () => {
       try {
         setError(''); setMedia(null);
-        const meta = await getMediaMeta(mediaId);
-        const withMeta = await decryptMediaMeta(cryptoKey, meta);
+        const m = meta || (await getMediaMeta(mediaId));
+        const withMeta = await decryptMediaMeta(cryptoKey, m);
         if (cancelled) return; setMedia(withMeta);
         if (withMeta.kind === 'image' || withMeta.kind === 'video' || withMeta.kind === 'audio') {
           const full = await fetchDecryptedMedia(cryptoKey, withMeta);
@@ -38,7 +40,8 @@ export function InlineMedia({ cryptoKey, mediaId, layout = 'aside', width = 38 }
     };
     if (cryptoKey && mediaId) load();
     return () => { cancelled = true; if (urlRef.current) URL.revokeObjectURL(urlRef.current); urlRef.current = null; };
-  }, [cryptoKey, mediaId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cryptoKey, mediaId, meta]);
 
   const handleDownload = async () => {
     if (!media) return;
@@ -89,7 +92,7 @@ export function InlineMedia({ cryptoKey, mediaId, layout = 'aside', width = 38 }
  * Read-only rendering: media wraps on left, text continues on right side.
  * Next line (next standalone text block) starts below image (clear).
  */
-export default function EntryContent({ blocks, cryptoKey }) {
+export default function EntryContent({ blocks, cryptoKey, metas = null }) {
   const nodes = [];
   let flow = [];
   let flowKey = 0;
@@ -118,7 +121,7 @@ export default function EntryContent({ blocks, cryptoKey }) {
       nodes.push(
         <div key={`wrap-${block.key}`} className="flex flex-col sm:flex-row gap-4 my-3 items-start">
           <div className="flex-shrink-0 w-full sm:w-auto" style={{ width: `min(${width}%, 100%)`, maxWidth: `${width}%`, minWidth: '140px' }}>
-            <InlineMedia cryptoKey={cryptoKey} mediaId={block.mediaId} width={width} />
+            <InlineMedia cryptoKey={cryptoKey} mediaId={block.mediaId} width={width} meta={metas?.[block.mediaId] || null} />
           </div>
           <div className="flex-1 min-w-0 font-sans text-sm sm:text-base leading-[1.95] whitespace-pre-wrap" style={{ color: 'var(--text-body)' }}>
             {rightText.length > 0 ? rightText : <span className="text-xs italic" style={{ color: 'var(--text-ghost)' }}></span>}

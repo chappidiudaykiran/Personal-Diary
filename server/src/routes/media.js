@@ -120,7 +120,9 @@ router.get('/:mediaId/file', async (req, res) => {
       'Content-Type': 'application/octet-stream',
       'Content-Length': media.data.length,
       'X-Media-IV': media.iv,
-      'Cache-Control': 'private, no-store',
+      // Bytes are immutable per mediaId (edits upload new ids) and opaque
+      // ciphertext, so long-lived private caching is safe and makes reopen instant.
+      'Cache-Control': 'private, max-age=31536000, immutable',
     });
     res.send(media.data);
   } catch (error) {

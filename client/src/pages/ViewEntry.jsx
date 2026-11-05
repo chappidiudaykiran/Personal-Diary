@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Pencil, Trash2, Save, X, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -50,6 +50,8 @@ export default function ViewEntry() {
   const [initialBlocks, setInitialBlocks] = useState([]);
   const [initialMood, setInitialMood] = useState('');
   const [savedMediaIds, setSavedMediaIds] = useState([]);
+  const [mediaMetas, setMediaMetas] = useState({});
+  const [mediaReady, setMediaReady] = useState(false);
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -59,11 +61,19 @@ export default function ViewEntry() {
   // Hide footer + toolbar while typing so text stays clearly visible
   const keyboardOpen = useKeyboardOpen();
 
-  // ─── Load & decrypt entry (old attachments become inline blocks at the end) ──
+  // Guards the background media merge below (avoids touching blocks mid-edit)
+  const editingRef = useRef(false);
+  editingRef.current = editing;
+
+  // ─── Load & decrypt entry ──────────────────────────────────────────────────
+  // Two phases: paint title + text immediately after decrypt, then fill in
+  // media metas (and any legacy unreferenced attachments) in the background.
   useEffect(() => {
+    let cancelled = false;
     const load = async () => {
       try {
         const { data } = await apiClient.get(`/entries/${id}`);
+        if (cancelled) return;
         setEntry(data.entry);
         setMood(data.entry.mood || '');
         setInitialMood(data.entry.mood || '');
@@ -72,43 +82,54 @@ export default function ViewEntry() {
           decrypt(cryptoKey, data.entry.encryptedTitle, data.entry.iv),
           decrypt(cryptoKey, data.entry.encryptedContent, data.entry.ivContent),
         ]);
+        if (cancelled) return;
         setTitle(decTitle);
         setInitialTitle(decTitle);
 
-        let parsed = parseEntryContent(decContent);
-        let mediaIds = [];
-        try {
-          const metas = await listMedia(id);
-          mediaIds = metas.map((m) => m._id);
-          const referenced = referencedMediaIds(parsed);
-          const unreferenced = metas.filter((m) => !referenced.has(m._id));
-          if (unreferenced.length > 0) {
-            parsed = [
-              ...parsed,
-              ...unreferenced.map((m) => createMediaBlock({ mediaId: m._id })),
-            ];
-          }
-        } catch (_) {
-          // Attachments are optional — the entry itself still loads
-        }
-
+        const parsed = parseEntryContent(decContent);
         const normalized = normalizeBlocks(parsed);
         setBlocks(normalized);
         setInitialBlocks(cloneBlocks(normalized));
-        setSavedMediaIds(mediaIds);
+        setLoading(false);
+
+        // Phase 2 — media list (entry is already visible; media fills in)
+        try {
+          const metas = await listMedia(id);
+          if (cancelled) return;
+          const byId = {};
+          for (const m of metas) byId[m._id] = m;
+          setMediaMetas(byId);
+          setSavedMediaIds(metas.map((m) => m._id));
+          const referenced = referencedMediaIds(parsed);
+          const unreferenced = metas.filter((m) => !referenced.has(m._id));
+          if (unreferenced.length > 0 && !editingRef.current) {
+            const extra = unreferenced.map((m) => createMediaBlock({ mediaId: m._id }));
+            setBlocks((prev) => normalizeBlocks([...prev, ...extra]));
+            setInitialBlocks((prev) => normalizeBlocks([...prev, ...extra]));
+          }
+        } catch (_) {
+          // Attachments are optional — the entry itself already loads
+        }
+        if (!cancelled) setMediaReady(true);
       } catch (err) {
+        if (cancelled) return;
         toast.error('Failed to load entry');
         navigate('/dashboard');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     if (cryptoKey) {
+      setMediaReady(false);
+      setMediaMetas({});
       load();
     } else {
       setLoading(false);
     }
+    return () => {
+      cancelled = true;
+    };
   }, [id, cryptoKey, navigate]);
 
   const encryptEntry = async (blocksToSave) => {
@@ -165,11 +186,15 @@ export default function ViewEntry() {
       const { data } = await apiClient.put(`/entries/${id}`, await encryptEntry(finalBlocks));
       setEntry(data.entry);
 
-      // 3. Delete saved media whose blocks were removed while editing
+      // 3. Delete saved media whose blocks were removed while editing.
+      // Only when the media list finished loading — otherwise every saved
+      // photo would look "removed".
       const stillReferenced = referencedMediaIds(finalBlocks);
-      const removedIds = savedMediaIds.filter((mediaId) => !stillReferenced.has(mediaId));
-      if (removedIds.length > 0) {
-        await Promise.allSettled(removedIds.map((mediaId) => deleteMedia(mediaId)));
+      if (mediaReady) {
+        const removedIds = savedMediaIds.filter((mediaId) => !stillReferenced.has(mediaId));
+        if (removedIds.length > 0) {
+          await Promise.allSettled(removedIds.map((mediaId) => deleteMedia(mediaId)));
+        }
       }
 
       setBlocks(finalBlocks);
@@ -327,7 +352,7 @@ export default function ViewEntry() {
             {editing ? (
               <BlockEditor blocks={blocks} onChange={setBlocks} cryptoKey={cryptoKey} disabled={saving} hideToolbar={keyboardOpen} />
             ) : (
-              <EntryContent blocks={blocks} cryptoKey={cryptoKey} />
+              <EntryContent blocks={blocks} cryptoKey={cryptoKey} metas={mediaMetas} />
             )}
           </div>
 
