@@ -10,6 +10,7 @@ import apiClient from '../api/apiClient.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { encrypt } from '../crypto/cryptoUtils.js';
 import { useAutoSave } from '../hooks/useAutoSave.js';
+import { useKeyboardOpen } from '../hooks/useKeyboardOpen.js';
 import {
   createTextBlock,
   serializeBlocks,
@@ -29,6 +30,8 @@ export default function NewEntry() {
   const [mood, setMood] = useState('');
   const [uploadStatus, setUploadStatus] = useState('');
   const [saving, setSaving] = useState(false);
+  // While the keyboard is open, hide footer + editor toolbar so typed text is fully visible
+  const keyboardOpen = useKeyboardOpen();
 
   // Autosave draft (title + text blocks + mood). Pending image files
   // can't be stored in localStorage, so they are skipped on restore.
@@ -173,7 +176,7 @@ export default function NewEntry() {
 
         <form onSubmit={handleSave} className="flex-1 min-h-0 flex flex-col">
           <div
-            className="flex-1 min-h-0 flex flex-col rounded-2xl overflow-hidden fade-up shadow-sm"
+            className="flex-1 min-h-0 flex flex-col rounded-2xl overflow-hidden fade-up shadow-sm relative"
             style={{
               background: 'var(--panel-gradient)',
               border: '1px solid var(--border-color)',
@@ -212,10 +215,24 @@ export default function NewEntry() {
 
             {/* Writing area — only this part scrolls, and only when content is long */}
             <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 pb-6 scroll-pb-32 sm:scroll-pb-28" style={{ WebkitOverflowScrolling: 'touch' }}>
-              <BlockEditor blocks={blocks} onChange={setBlocks} cryptoKey={cryptoKey} disabled={saving} />
+              <BlockEditor blocks={blocks} onChange={setBlocks} cryptoKey={cryptoKey} disabled={saving} hideToolbar={keyboardOpen} />
             </div>
 
-            {/* Footer — always visible, no page scroll needed */}
+            {/* Floating save while typing — footer is hidden so text stays visible */}
+            {keyboardOpen && (
+              <button
+                type="submit"
+                disabled={saving || !canSave}
+                className="absolute bottom-3 right-3 z-20 flex items-center gap-1.5 px-4 py-2.5 rounded-full text-sm font-semibold shadow-lg disabled:opacity-40 cursor-pointer"
+                style={{ background: 'linear-gradient(135deg, #c4913a, #dba84a)', color: '#0c0c17' }}
+              >
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+            )}
+
+            {/* Footer — hidden while typing so it never covers what you write */}
+            {!keyboardOpen && (
             <div
               className="px-4 sm:px-8 py-3 flex-shrink-0 space-y-3"
               style={{ borderTop: '1px solid var(--border-color)', background: 'var(--bg-surface)' }}
@@ -297,6 +314,7 @@ export default function NewEntry() {
                 </button>
               </div>
             </div>
+            )}
           </div>
         </form>
       </main>

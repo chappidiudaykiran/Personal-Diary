@@ -98,7 +98,7 @@ function AsideFilePreview({ file }) {
   );
 }
 
-export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = false }) {
+export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = false, hideToolbar = false }) {
   const fileInputRef = useRef(null);
   const activeRef = useRef({ key: null, cursor: 0 });
   const focusKeyRef = useRef(null);
@@ -307,9 +307,10 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
       <div className="flex-1">
         {rendered}
         {/* Spacer so the last line can scroll above the sticky Media bar */}
-        <div className="h-24 sm:h-20" aria-hidden="true" />
+        {!hideToolbar && <div className="h-24 sm:h-20" aria-hidden="true" />}
       </div>
 
+      {!hideToolbar && (
       <div className="sticky bottom-2 mt-3 flex items-center gap-2 rounded-xl px-2 py-2 z-10" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', boxShadow: '0 -4px 16px rgba(0,0,0,0.12)', marginBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         <button type="button" disabled={disabled} onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #c4913a, #dba84a)', color: '#0c0c17' }}><ImagePlus className="w-4 h-4" />Media</button>
         <button type="button" disabled={disabled} onClick={insertTextBlock} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium cursor-pointer disabled:opacity-50" style={{ background: 'var(--bg-raised)', border: '1px solid var(--border-color)', color: 'var(--text-muted)' }}><Type className="w-4 h-4" />Text</button>
@@ -317,6 +318,7 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
         <span className="sm:hidden text-[11px] ml-1" style={{ color: 'var(--text-ghost)' }}>Double-tap to resize</span>
         <span className="text-[11px] ml-auto flex-shrink-0" style={{ color: 'var(--text-ghost)' }}>{mediaCount}/{MAX_FILES_PER_ENTRY}</span>
       </div>
+      )}
       <input ref={fileInputRef} type="file" multiple accept={MEDIA_ACCEPT} className="hidden" onChange={(e) => { insertFiles(e.target.files); e.target.value = ''; }} />
     </div>
   );
