@@ -7,6 +7,17 @@ import { AuthProvider } from './context/AuthContext.jsx';
 import { ThemeProvider, useTheme } from './context/ThemeContext.jsx';
 import './index.css';
 
+// One-time cleanup of caches from the old hand-written SW (v1/v2/v3)
+try {
+  if ('caches' in window) {
+    caches.keys().then((keys) => {
+      keys
+        .filter((k) => k.startsWith('diary-static-') || k.startsWith('diary-api-') || k.startsWith('personal-diary-'))
+        .forEach((k) => caches.delete(k).catch(() => {}));
+    }).catch(() => {});
+  }
+} catch (_) {}
+
 function ThemedToaster() {
   const { isDark } = useTheme();
   return (

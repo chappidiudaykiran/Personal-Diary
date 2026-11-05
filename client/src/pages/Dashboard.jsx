@@ -34,34 +34,60 @@ export default function Dashboard() {
   const [moodFilter, setMoodFilter] = useState('');
 
   // ─── Fetch & decrypt entries with caching and fast rendering ───────────────
+  // Stale-while-revalidate: paint localStorage cache instantly (works offline),
+  // then refresh from network in the background.
   useEffect(() => {
     let isMounted = true;
+    const userId = user?.id || user?._id || 'guest';
+    const listKey = `diary_entries_cache_${userId}`;
+    const titlesKey = `diary_titles_cache_${userId}`;
+
+    try {
+      const cachedList = JSON.parse(localStorage.getItem(listKey) || 'null');
+      const cachedTitles = JSON.parse(localStorage.getItem(titlesKey) || 'null');
+      if (isMounted && Array.isArray(cachedList) && cachedList.length > 0) {
+        setEntries(cachedList);
+        if (cachedTitles && typeof cachedTitles === 'object') setDecryptedTitles(cachedTitles);
+        setLoading(false);
+      }
+    } catch (_) {}
 
     const fetchEntries = async () => {
       try {
-        setLoading(true);
+        if (!isMounted) return;
+        // Only show skeleton when there is nothing cached to paint
+        setEntries((prev) => {
+          if (prev.length === 0) setLoading(true);
+          return prev;
+        });
         const { data } = await apiClient.get('/entries');
         const list = data.entries || [];
 
         if (!isMounted) return;
         setEntries(list);
-        
+        try { localStorage.setItem(listKey, JSON.stringify(list)); } catch (_) {}
+
         // Stop skeleton loader immediately once entries list is fetched
         setLoading(false);
 
         // Load cached titles instantly, decrypt missing in one batch (single re-render)
+        // persistent localStorage (not session) so offline restarts still paint fast
         const titleMap = {};
         const missing = [];
 
         for (const entry of list) {
           const cacheKey = `dec_title_${entry._id}_${entry.updatedAt}`;
-          const cached = sessionStorage.getItem(cacheKey);
+          const cached = localStorage.getItem(cacheKey) || sessionStorage.getItem(cacheKey);
           if (cached) titleMap[entry._id] = cached;
           else if (cryptoKey) missing.push(entry);
         }
 
         if (isMounted && Object.keys(titleMap).length > 0) {
-          setDecryptedTitles((prev) => ({ ...prev, ...titleMap }));
+          setDecryptedTitles((prev) => {
+            const merged = { ...prev, ...titleMap };
+            try { localStorage.setItem(titlesKey, JSON.stringify(merged)); } catch (_) {}
+            return merged;
+          });
         }
 
         if (missing.length > 0 && cryptoKey) {
@@ -70,7 +96,10 @@ export default function Dashboard() {
               const cacheKey = `dec_title_${entry._id}_${entry.updatedAt}`;
               try {
                 const decrypted = await decrypt(cryptoKey, entry.encryptedTitle, entry.iv);
-                try { sessionStorage.setItem(cacheKey, decrypted); } catch (_) {}
+                try {
+                  localStorage.setItem(cacheKey, decrypted);
+                  sessionStorage.setItem(cacheKey, decrypted);
+                } catch (_) {}
                 return [entry._id, decrypted];
               } catch {
                 return [entry._id, 'Untitled Entry'];
@@ -80,12 +109,26 @@ export default function Dashboard() {
           if (isMounted) {
             const batch = { ...titleMap };
             for (const [id, title] of results) batch[id] = title;
-            setDecryptedTitles((prev) => ({ ...prev, ...batch }));
+            setDecryptedTitles((prev) => {
+              const merged = { ...prev, ...batch };
+              try { localStorage.setItem(titlesKey, JSON.stringify(merged)); } catch (_) {}
+              return merged;
+            });
           }
         }
       } catch (err) {
         console.error('Fetch entries error:', err);
-        if (isMounted) toast.error('Failed to load entries');
+        // Offline / server asleep: keep cached list on screen, don't spam errors
+        if (isMounted) {
+          setLoading(false);
+          let hasCache = false;
+          try { hasCache = (JSON.parse(localStorage.getItem(listKey) || 'null') || []).length > 0; } catch (_) {}
+          if (!navigator.onLine || hasCache) {
+            if (!navigator.onLine) toast('You are offline — showing saved entries', { icon: '📴' });
+          } else {
+            toast.error('Failed to load entries');
+          }
+        }
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -100,7 +143,7 @@ export default function Dashboard() {
     return () => {
       isMounted = false;
     };
-  }, [cryptoKey]);
+  }, [cryptoKey, user?.id, user?._id]);
 
   // ─── Filter entries ────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
