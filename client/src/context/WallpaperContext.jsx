@@ -216,10 +216,11 @@ export function WallpaperProvider({ children }) {
   // Ink colors for text sitting directly on the wallpaper.
   const topInk = !tone ? 'var(--text-primary)' : tone === 'light' ? '#23201c' : '#f5efe4';
   const topMuted = !tone ? 'var(--text-muted)' : tone === 'light' ? 'rgba(35,32,28,0.66)' : 'rgba(245,239,228,0.72)';
+  const topGold = !tone ? 'var(--gold)' : tone === 'light' ? '#8a5a12' : '#e0aa4e';
 
   return (
     <WallpaperContext.Provider
-      value={{ wallpaper, setWallpaper, customUrl, uploadCustom, deleteCustom, presets: PRESET_WALLPAPERS, tone, topInk, topMuted }}
+      value={{ wallpaper, setWallpaper, customUrl, uploadCustom, deleteCustom, presets: PRESET_WALLPAPERS, tone, topInk, topMuted, topGold }}
     >
       {children}
     </WallpaperContext.Provider>

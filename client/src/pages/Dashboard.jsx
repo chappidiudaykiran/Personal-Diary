@@ -28,7 +28,7 @@ function formatFullDate(date) {
 
 export default function Dashboard() {
   const { user, cryptoKey } = useAuth();
-  const { topInk, topMuted } = useWallpaper();
+  const { topInk, topMuted, topGold } = useWallpaper();
   const [entries, setEntries] = useState([]);
   const [decryptedTitles, setDecryptedTitles] = useState({});
   const [loading, setLoading] = useState(true);
@@ -180,7 +180,7 @@ export default function Dashboard() {
                 style={{ color: topInk, fontWeight: 300 }}
               >
                 {formatGreeting(now)},{' '}
-                <em className="not-italic" style={{ color: 'var(--gold)' }}>
+                <em className="not-italic" style={{ color: topGold }}>
                   {user?.username || 'friend'}
                 </em>
               </h1>

@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { BookOpen, Delete, Sun, Moon, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
+import { useWallpaper } from '../context/WallpaperContext.jsx';
 
 export default function LockScreen() {
   const { user, unlockWithPin, logout } = useAuth();
   const { isDark, toggleTheme } = useTheme();
+  const { topInk, topMuted } = useWallpaper();
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
   const [unlocking, setUnlocking] = useState(false);
@@ -68,7 +70,7 @@ export default function LockScreen() {
           >
             <BookOpen className="w-3.5 h-3.5 text-[#0c0c17]" />
           </div>
-          <span className="font-display font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
+          <span className="font-display font-semibold text-sm" style={{ color: topInk }}>
             My Diary
           </span>
         </div>
@@ -114,10 +116,10 @@ export default function LockScreen() {
           {user?.username ? user.username[0] : 'D'}
         </div>
 
-        <h2 className="font-display text-2xl mb-1" style={{ color: 'var(--text-primary)', fontWeight: 400 }}>
+        <h2 className="font-display text-2xl mb-1" style={{ color: topInk, fontWeight: 400 }}>
           {user?.username || 'Welcome Back'}
         </h2>
-        <p className="text-xs mb-8" style={{ color: 'var(--text-muted)' }}>
+        <p className="text-xs mb-8" style={{ color: topMuted }}>
           {error ? (
             <span className="text-red-500 font-medium">Incorrect PIN. Try again</span>
           ) : (
