@@ -140,3 +140,69 @@ export function normalizeBlocks(blocks) {
 export function cloneBlocks(blocks) {
   return (blocks || []).map((b) => ({ ...b }));
 }
+
+/**
+ * Draft helpers for autosave (localStorage, plaintext).
+ * File objects cannot be stored, so pending file blocks are saved as
+ * markers ({t:'media-pending', name}) and skipped on restore.
+ * Returns "" when there is nothing meaningful to save, so the
+ * useAutoSave hasData check works.
+ */
+export function blocksToDraftString(blocks) {
+  const out = [];
+  for (const block of blocks || []) {
+    if (block.type === 'text') {
+      out.push({ t: 'text', v: block.text || '' });
+    } else if (block.type === 'media') {
+      const layout = normalizeLayout(block.layout);
+      if (block.mediaId) {
+        const item = { t: 'media', id: block.mediaId };
+        if (layout === 'aside') {
+          item.layout = 'aside';
+          item.w = clampAsideWidth(block.width);
+        }
+        out.push(item);
+      } else if (block.file) {
+        const item = { t: 'media-pending', name: block.file.name || 'file' };
+        if (layout === 'aside') {
+          item.layout = 'aside';
+          item.w = clampAsideWidth(block.width);
+        }
+        out.push(item);
+      }
+    }
+  }
+  const hasText = out.some((b) => b.t === 'text' && (b.v || '').trim());
+  const hasMedia = out.some((b) => b.t === 'media' || b.t === 'media-pending');
+  if (!hasText && !hasMedia) return '';
+  return JSON.stringify(out);
+}
+
+/** Restore blocks from a draft string. Pending files cannot be restored — skipped. */
+export function draftStringToBlocks(draftStr) {
+  if (!draftStr || !draftStr.trim()) return null;
+  const trimmed = draftStr.trim();
+  // Legacy plain-text draft
+  if (!trimmed.startsWith('[')) {
+    return normalizeBlocks([createTextBlock(draftStr)]);
+  }
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (!Array.isArray(parsed) || parsed.length === 0) return null;
+    const blocks = [];
+    let skippedFiles = 0;
+    for (const b of parsed) {
+      if (b?.t === 'text' && typeof b.v === 'string') {
+        blocks.push(createTextBlock(b.v));
+      } else if (b?.t === 'media' && typeof b.id === 'string') {
+        blocks.push(createMediaBlock({ mediaId: b.id, layout: b.layout, width: b.w ?? b.width }));
+      } else if (b?.t === 'media-pending') {
+        skippedFiles += 1;
+      }
+    }
+    if (blocks.length === 0) return null;
+    return { blocks: normalizeBlocks(blocks), skippedFiles };
+  } catch (_) {
+    return null;
+  }
+}

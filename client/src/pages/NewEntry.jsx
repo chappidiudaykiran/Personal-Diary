@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -9,6 +9,7 @@ import { uploadMediaFile } from '../api/mediaApi.js';
 import apiClient from '../api/apiClient.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { encrypt } from '../crypto/cryptoUtils.js';
+import { useAutoSave } from '../hooks/useAutoSave.js';
 import {
   createTextBlock,
   serializeBlocks,
@@ -16,10 +17,12 @@ import {
   blocksToPlainText,
   hasBlockContent,
   normalizeBlocks,
+  blocksToDraftString,
+  draftStringToBlocks,
 } from '../utils/entryBlocks.js';
 
 export default function NewEntry() {
-  const { cryptoKey, user } = useAuth();
+  const { cryptoKey } = useAuth();
   const navigate = useNavigate();
   const [title, setTitle] = useState('');
   const [blocks, setBlocks] = useState(() => normalizeBlocks([createTextBlock('')]));
@@ -27,14 +30,40 @@ export default function NewEntry() {
   const [uploadStatus, setUploadStatus] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // New Entry always starts blank — no draft is restored or auto-saved.
-  // Purge any draft left over from the old behaviour so it never comes back.
-  useEffect(() => {
-    try {
-      const userId = user?.id || user?._id || 'guest';
-      localStorage.removeItem(`diary_draft_${userId}_new_entry`);
-    } catch (_) {}
-  }, [user]);
+  // Autosave draft (title + text blocks + mood). Pending image files
+  // can't be stored in localStorage, so they are skipped on restore.
+  const draftContent = useMemo(() => blocksToDraftString(blocks), [blocks]);
+
+  const handleRestore = useCallback((parsed) => {
+    if (parsed?.title) setTitle(parsed.title);
+    if (parsed?.mood) setMood(parsed.mood);
+    if (parsed?.content) {
+      const restored = draftStringToBlocks(parsed.content);
+      if (restored) {
+        const list = restored.blocks || restored;
+        const skipped = restored.skippedFiles || 0;
+        setBlocks(Array.isArray(list) ? list : normalizeBlocks([createTextBlock('')]));
+        if (skipped > 0) {
+          toast(`Draft restored — ${skipped} image${skipped === 1 ? '' : 's'} need re-adding`, { icon: '🖼️' });
+        } else {
+          toast.success('Draft restored');
+        }
+      }
+    }
+  }, []);
+
+  const {
+    autoSaveEnabled,
+    toggleAutoSave,
+    status: autoSaveStatus,
+    lastSavedAt,
+    hasRestoredDraft,
+    clearDraft,
+  } = useAutoSave({
+    draftId: 'new_entry',
+    data: { title, content: draftContent, mood },
+    onRestore: handleRestore,
+  });
 
   const wordCount = countBlockWords(blocks);
   const charCount = blocksToPlainText(blocks).length;
@@ -106,6 +135,7 @@ export default function NewEntry() {
       } else {
         toast.success('Entry saved ✨');
       }
+      clearDraft();
       navigate(`/entry/${entryId}`);
     } catch (err) {
       toast.error('Failed to save entry. Please try again.');
@@ -202,6 +232,39 @@ export default function NewEntry() {
                   Mood
                 </span>
                 <MoodPicker value={mood} onChange={setMood} />
+              </div>
+
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <button
+                  type="button"
+                  onClick={toggleAutoSave}
+                  className="flex items-center gap-2 text-[11px] cursor-pointer rounded-full px-2.5 py-1 transition-colors"
+                  style={{
+                    background: autoSaveEnabled ? 'var(--gold-glow)' : 'var(--bg-elevated)',
+                    border: '1px solid var(--border-color)',
+                    color: autoSaveEnabled ? 'var(--gold)' : 'var(--text-ghost)',
+                  }}
+                  title={autoSaveEnabled ? 'Turn autosave off' : 'Turn autosave on'}
+                >
+                  <span
+                    className="w-6 h-3.5 rounded-full relative transition-colors flex-shrink-0"
+                    style={{ background: autoSaveEnabled ? 'var(--gold)' : 'var(--border-color)' }}
+                  >
+                    <span
+                      className="absolute top-0.5 w-2.5 h-2.5 rounded-full bg-white transition-all"
+                      style={{ left: autoSaveEnabled ? '12px' : '2px' }}
+                    />
+                  </span>
+                  Autosave {autoSaveEnabled ? 'on' : 'off'}
+                </button>
+                <span className="text-[11px]" style={{ color: 'var(--text-ghost)' }}>
+                  {autoSaveStatus === 'saving' ? 'Saving draft…' : autoSaveStatus === 'saved' && lastSavedAt ? `Draft saved ${lastSavedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : autoSaveStatus === 'restored' || hasRestoredDraft ? 'Draft restored' : autoSaveStatus === 'disabled' ? 'Autosave off' : ''}
+                  {hasRestoredDraft && (
+                    <button type="button" onClick={clearDraft} className="ml-2 underline cursor-pointer" style={{ color: 'var(--gold)' }}>
+                      Discard
+                    </button>
+                  )}
+                </span>
               </div>
 
               <div className="flex items-center justify-between gap-3">
