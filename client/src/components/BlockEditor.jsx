@@ -31,14 +31,37 @@ function AutoTextarea({ blockKey, value, onChange, onCursor, placeholder, disabl
     el.style.height = `${Math.max(el.scrollHeight, first ? 72 : 36)}px`;
   }, [value, first]);
   const trackCursor = (e) => onCursor(blockKey, e.target.selectionStart ?? value.length);
+  // Keep the focused line visible above the sticky Media bar + keyboard
+  const scrollIntoView = (el) => {
+    try {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } catch (_) {}
+  };
+  const handleFocus = (e) => {
+    trackCursor(e);
+    const el = e.currentTarget;
+    // Wait for mobile keyboard to open, then center the field
+    setTimeout(() => scrollIntoView(el), 300);
+  };
   return (
     <textarea
       ref={ref}
       data-block-key={blockKey}
       value={value}
       disabled={disabled}
-      onChange={(e) => { onChange(e.target.value); trackCursor(e); }}
-      onFocus={trackCursor}
+      onChange={(e) => {
+        onChange(e.target.value);
+        trackCursor(e);
+        // Typing at the end: keep caret above the sticky bar
+        const el = e.currentTarget;
+        requestAnimationFrame(() => {
+          try {
+            const nearEnd = (el.selectionStart ?? 0) >= (el.value?.length ?? 0) - 2;
+            if (nearEnd && document.activeElement === el) scrollIntoView(el);
+          } catch (_) {}
+        });
+      }}
+      onFocus={handleFocus}
       onSelect={trackCursor}
       onClick={trackCursor}
       onKeyUp={trackCursor}
@@ -281,9 +304,13 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
 
   return (
     <div className="flex flex-col min-h-full">
-      <div className="flex-1">{rendered}</div>
+      <div className="flex-1">
+        {rendered}
+        {/* Spacer so the last line can scroll above the sticky Media bar */}
+        <div className="h-24 sm:h-20" aria-hidden="true" />
+      </div>
 
-      <div className="sticky bottom-0 mt-3 flex items-center gap-2 rounded-xl px-2 py-2" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', boxShadow: '0 -4px 16px rgba(0,0,0,0.12)' }}>
+      <div className="sticky bottom-2 mt-3 flex items-center gap-2 rounded-xl px-2 py-2 z-10" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', boxShadow: '0 -4px 16px rgba(0,0,0,0.12)', marginBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         <button type="button" disabled={disabled} onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #c4913a, #dba84a)', color: '#0c0c17' }}><ImagePlus className="w-4 h-4" />Media</button>
         <button type="button" disabled={disabled} onClick={insertTextBlock} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium cursor-pointer disabled:opacity-50" style={{ background: 'var(--bg-raised)', border: '1px solid var(--border-color)', color: 'var(--text-muted)' }}><Type className="w-4 h-4" />Text</button>
         <span className="hidden sm:flex items-center gap-1 text-[11px] ml-1" style={{ color: 'var(--text-ghost)' }}><Lock className="w-3 h-3" />Double-click image to resize</span>

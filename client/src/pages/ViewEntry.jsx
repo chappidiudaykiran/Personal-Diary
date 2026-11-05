@@ -320,7 +320,7 @@ export default function ViewEntry() {
           </div>
 
           {/* Body — only this part scrolls, and only when content is long */}
-          <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 py-4">
+          <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 py-4 scroll-pb-32 sm:scroll-pb-28" style={{ WebkitOverflowScrolling: 'touch' }}>
             {editing ? (
               <BlockEditor blocks={blocks} onChange={setBlocks} cryptoKey={cryptoKey} disabled={saving} />
             ) : (

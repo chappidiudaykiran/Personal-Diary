@@ -211,7 +211,7 @@ export default function NewEntry() {
             <div className="mx-4 sm:mx-8 my-2 flex-shrink-0" style={{ height: '1px', background: 'var(--border-color)' }} />
 
             {/* Writing area — only this part scrolls, and only when content is long */}
-            <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 pb-3">
+            <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 pb-6 scroll-pb-32 sm:scroll-pb-28" style={{ WebkitOverflowScrolling: 'touch' }}>
               <BlockEditor blocks={blocks} onChange={setBlocks} cryptoKey={cryptoKey} disabled={saving} />
             </div>
 
