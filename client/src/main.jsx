@@ -5,6 +5,7 @@ import { Toaster } from 'react-hot-toast';
 import App from './App.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { ThemeProvider, useTheme } from './context/ThemeContext.jsx';
+import { WallpaperProvider } from './context/WallpaperContext.jsx';
 import './index.css';
 
 // One-time cleanup of caches from the old hand-written SW (v1/v2/v3)
@@ -47,10 +48,12 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
       <ThemeProvider>
-        <AuthProvider>
-          <App />
-          <ThemedToaster />
-        </AuthProvider>
+        <WallpaperProvider>
+          <AuthProvider>
+            <App />
+            <ThemedToaster />
+          </AuthProvider>
+        </WallpaperProvider>
       </ThemeProvider>
     </BrowserRouter>
   </React.StrictMode>

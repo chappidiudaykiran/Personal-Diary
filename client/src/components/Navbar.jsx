@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { BookOpen, Plus, LogOut, User, Sun, Moon, Lock, KeyRound } from 'lucide-react';
+import { BookOpen, Plus, LogOut, User, Sun, Moon, Lock, KeyRound, Image } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
 import SetPinModal from './SetPinModal.jsx';
+import WallpaperPicker from './WallpaperPicker.jsx';
 
 export default function Navbar() {
   const { user, logout, lockApp, hasPin } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [showPinModal, setShowPinModal] = useState(false);
+  const [showWallpaper, setShowWallpaper] = useState(false);
 
   const handleLogout = async () => {
     await logout();
@@ -68,6 +70,16 @@ export default function Navbar() {
               {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-amber-700" />}
             </button>
 
+            {/* Wallpaper */}
+            <button
+              onClick={() => setShowWallpaper(true)}
+              className="p-2 rounded-lg transition-all duration-150 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+              style={{ color: 'var(--text-muted)' }}
+              title="Change wallpaper"
+            >
+              <Image className="w-4 h-4" />
+            </button>
+
             {/* Lock Button */}
             <button
               onClick={handleLock}
@@ -116,6 +128,7 @@ export default function Navbar() {
       </nav>
 
       <SetPinModal isOpen={showPinModal} onClose={() => setShowPinModal(false)} />
+      <WallpaperPicker isOpen={showWallpaper} onClose={() => setShowWallpaper(false)} />
     </>
   );
 }
