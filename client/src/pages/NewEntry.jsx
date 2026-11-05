@@ -11,6 +11,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { encrypt } from '../crypto/cryptoUtils.js';
 import { useAutoSave } from '../hooks/useAutoSave.js';
 import { useKeyboardOpen } from '../hooks/useKeyboardOpen.js';
+import { useWallpaper } from '../context/WallpaperContext.jsx';
 import { saveDraftBlobs, loadDraftBlobs, clearDraftBlobs } from '../utils/draftMediaStore.js';
 import {
   createTextBlock,
@@ -31,6 +32,7 @@ export default function NewEntry() {
   const [saving, setSaving] = useState(false);
   // While the keyboard is open, hide footer + editor toolbar so typed text is fully visible
   const keyboardOpen = useKeyboardOpen();
+  const { topInk, topMuted } = useWallpaper();
 
   const userId = user?.id || user?._id || 'guest';
   const draftKey = `diary_draft_${userId}_new_entry`;
@@ -290,9 +292,9 @@ export default function NewEntry() {
         <button
           onClick={() => navigate(-1)}
           className="flex items-center gap-1.5 text-sm mb-3 flex-shrink-0 self-start transition-colors cursor-pointer"
-          style={{ color: 'var(--text-muted)' }}
+          style={{ color: topMuted }}
           onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--gold)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = topMuted; }}
         >
           <ArrowLeft className="w-4 h-4" />
           Back to diary
@@ -317,7 +319,7 @@ export default function NewEntry() {
               className="px-4 sm:px-8 pt-4 pb-3 flex-shrink-0"
               style={{ borderBottom: '1px solid var(--border-color)' }}
             >
-              <p className="text-[11px] sm:text-xs uppercase tracking-widest font-medium" style={{ color: 'var(--text-muted)' }}>
+              <p className="text-[11px] sm:text-xs uppercase tracking-widest font-medium" style={{ color: topMuted }}>
                 {dateLabel}
               </p>
             </div>
@@ -331,7 +333,7 @@ export default function NewEntry() {
                 placeholder="Entry title…"
                 maxLength={200}
                 className="w-full outline-none bg-transparent font-display text-2xl sm:text-3xl transition-colors"
-                style={{ color: 'var(--text-primary)', fontWeight: 400 }}
+                style={{ color: topInk, fontWeight: 400 }}
               />
             </div>
 

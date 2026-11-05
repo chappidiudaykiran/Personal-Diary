@@ -6,6 +6,7 @@ import Navbar from '../components/Navbar.jsx';
 import EntryCard from '../components/EntryCard.jsx';
 import apiClient from '../api/apiClient.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useWallpaper } from '../context/WallpaperContext.jsx';
 import { decrypt } from '../crypto/cryptoUtils.js';
 import { MOODS } from '../components/MoodPicker.jsx';
 
@@ -27,6 +28,7 @@ function formatFullDate(date) {
 
 export default function Dashboard() {
   const { user, cryptoKey } = useAuth();
+  const { topInk, topMuted } = useWallpaper();
   const [entries, setEntries] = useState([]);
   const [decryptedTitles, setDecryptedTitles] = useState({});
   const [loading, setLoading] = useState(true);
@@ -170,19 +172,19 @@ export default function Dashboard() {
         >
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
             <div>
-              <p className="text-xs uppercase tracking-widest mb-2 font-medium" style={{ color: 'var(--text-muted)' }}>
+              <p className="text-xs uppercase tracking-widest mb-2 font-medium" style={{ color: topMuted }}>
                 {formatFullDate(now)}
               </p>
               <h1
                 className="font-display text-3xl sm:text-4xl"
-                style={{ color: 'var(--text-primary)', fontWeight: 300 }}
+                style={{ color: topInk, fontWeight: 300 }}
               >
                 {formatGreeting(now)},{' '}
                 <em className="not-italic" style={{ color: 'var(--gold)' }}>
                   {user?.username || 'friend'}
                 </em>
               </h1>
-              <p className="mt-2 text-sm" style={{ color: 'var(--text-muted)' }}>
+              <p className="mt-2 text-sm" style={{ color: topMuted }}>
                 {loading
                   ? 'Loading your diary entries…'
                   : entries.length === 0

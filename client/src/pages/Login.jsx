@@ -4,10 +4,12 @@ import { Eye, EyeOff, ArrowRight, BookOpen, Sun, Moon } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
+import { useWallpaper } from '../context/WallpaperContext.jsx';
 
 export default function Login() {
   const { login } = useAuth();
   const { isDark, toggleTheme } = useTheme();
+  const { topInk, topMuted } = useWallpaper();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -121,23 +123,23 @@ export default function Login() {
             >
               <BookOpen className="w-4 h-4 text-[#0c0c17]" />
             </div>
-            <span className="font-display text-base font-semibold" style={{ color: 'var(--text-primary)' }}>My Diary</span>
+            <span className="font-display text-base font-semibold" style={{ color: topInk }}>My Diary</span>
           </div>
 
           <div className="fade-up">
             <h1
               className="font-display text-3xl mb-1"
-              style={{ color: 'var(--text-primary)', fontWeight: 400 }}
+              style={{ color: topInk, fontWeight: 400 }}
             >
               Welcome back
             </h1>
-            <p className="text-sm mb-8" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-sm mb-8" style={{ color: topMuted }}>
               Sign in to continue your journal
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium mb-2 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                <label className="block text-xs font-medium mb-2 uppercase tracking-wider" style={{ color: topMuted }}>
                   Email or Username
                 </label>
                 <input
@@ -166,7 +168,7 @@ export default function Login() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium mb-2 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                <label className="block text-xs font-medium mb-2 uppercase tracking-wider" style={{ color: topMuted }}>
                   Password
                 </label>
                 <div className="relative">
@@ -228,7 +230,7 @@ export default function Login() {
               </button>
             </form>
 
-            <p className="text-center text-sm mt-6" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-center text-sm mt-6" style={{ color: topMuted }}>
               New here?{' '}
               <Link
                 to="/register"

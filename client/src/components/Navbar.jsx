@@ -4,12 +4,14 @@ import { BookOpen, Plus, LogOut, User, Sun, Moon, Lock, KeyRound, Image } from '
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
+import { useWallpaper } from '../context/WallpaperContext.jsx';
 import SetPinModal from './SetPinModal.jsx';
 import WallpaperPicker from './WallpaperPicker.jsx';
 
 export default function Navbar() {
   const { user, logout, lockApp, hasPin } = useAuth();
   const { isDark, toggleTheme } = useTheme();
+  const { topInk, topMuted } = useWallpaper();
   const navigate = useNavigate();
   const [showPinModal, setShowPinModal] = useState(false);
   const [showWallpaper, setShowWallpaper] = useState(false);
@@ -52,7 +54,7 @@ export default function Navbar() {
             </div>
             <span
               className="font-display text-base font-semibold tracking-tight"
-              style={{ color: 'var(--text-primary)' }}
+              style={{ color: topInk }}
             >
               My Diary
             </span>
@@ -64,7 +66,7 @@ export default function Navbar() {
             <button
               onClick={toggleTheme}
               className="p-2 rounded-lg transition-all duration-150 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
-              style={{ color: 'var(--text-muted)' }}
+              style={{ color: topMuted }}
               title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
             >
               {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-amber-700" />}
@@ -74,7 +76,7 @@ export default function Navbar() {
             <button
               onClick={() => setShowWallpaper(true)}
               className="p-2 rounded-lg transition-all duration-150 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
-              style={{ color: 'var(--text-muted)' }}
+              style={{ color: topMuted }}
               title="Change wallpaper"
             >
               <Image className="w-4 h-4" />
@@ -84,7 +86,7 @@ export default function Navbar() {
             <button
               onClick={handleLock}
               className="p-2 rounded-lg transition-all duration-150 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
-              style={{ color: 'var(--text-muted)' }}
+              style={{ color: topMuted }}
               title={hasPin ? 'Lock Diary' : 'Set PIN Lock'}
             >
               {hasPin ? <Lock className="w-4 h-4 text-amber-500" /> : <KeyRound className="w-4 h-4" />}
@@ -107,7 +109,7 @@ export default function Navbar() {
             {user && (
               <div
                 className="hidden sm:flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg"
-                style={{ color: 'var(--text-muted)' }}
+                style={{ color: topMuted }}
               >
                 <User className="w-3 h-3" />
                 <span className="max-w-[90px] truncate">{user.username}</span>
@@ -118,7 +120,7 @@ export default function Navbar() {
             <button
               onClick={handleLogout}
               className="p-1.5 rounded-lg transition-all duration-150 hover:bg-red-500/10 hover:text-red-500 cursor-pointer"
-              style={{ color: 'var(--text-ghost)' }}
+              style={{ color: topMuted }}
               title="Sign out"
             >
               <LogOut className="w-4 h-4" />

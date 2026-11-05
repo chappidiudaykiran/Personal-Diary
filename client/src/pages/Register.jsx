@@ -4,10 +4,12 @@ import { Eye, EyeOff, ArrowRight, Check, BookOpen, Sun, Moon } from 'lucide-reac
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
+import { useWallpaper } from '../context/WallpaperContext.jsx';
 
 export default function Register() {
   const { register } = useAuth();
   const { isDark, toggleTheme } = useTheme();
+  const { topInk, topMuted } = useWallpaper();
   const navigate = useNavigate();
   const [form, setForm] = useState({ username: '', email: '', password: '', confirm: '' });
   const [showPw, setShowPw] = useState(false);
@@ -160,10 +162,10 @@ export default function Register() {
       <div className="flex-1 flex items-center justify-center p-6 sm:p-10">
         <div className="w-full max-w-sm">
           <div className="fade-up">
-            <h1 className="font-display text-3xl mb-1" style={{ color: 'var(--text-primary)', fontWeight: 400 }}>
+            <h1 className="font-display text-3xl mb-1" style={{ color: topInk, fontWeight: 400 }}>
               Create your diary
             </h1>
-            <p className="text-sm mb-8" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-sm mb-8" style={{ color: topMuted }}>
               A quiet space for your thoughts.
             </p>
 
@@ -173,7 +175,7 @@ export default function Register() {
                 { field: 'email', label: 'Email', type: 'email', placeholder: 'you@example.com', autocomplete: 'email' },
               ].map(({ field, label, type, placeholder, autocomplete }) => (
                 <div key={field}>
-                  <label className="block text-xs font-medium mb-2 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                  <label className="block text-xs font-medium mb-2 uppercase tracking-wider" style={{ color: topMuted }}>
                     {label}
                   </label>
                   <input
@@ -192,7 +194,7 @@ export default function Register() {
               ))}
 
               <div>
-                <label className="block text-xs font-medium mb-2 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                <label className="block text-xs font-medium mb-2 uppercase tracking-wider" style={{ color: topMuted }}>
                   Password
                 </label>
                 <div className="relative">
@@ -233,7 +235,7 @@ export default function Register() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium mb-2 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                <label className="block text-xs font-medium mb-2 uppercase tracking-wider" style={{ color: topMuted }}>
                   Confirm Password
                 </label>
                 <input
@@ -283,7 +285,7 @@ export default function Register() {
               </button>
             </form>
 
-            <p className="text-center text-sm mt-6" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-center text-sm mt-6" style={{ color: topMuted }}>
               Already have an account?{' '}
               <Link to="/login" className="font-medium" style={{ color: 'var(--gold)' }}>
                 Sign in

@@ -11,6 +11,7 @@ import apiClient from '../api/apiClient.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { encrypt, decrypt } from '../crypto/cryptoUtils.js';
 import { useKeyboardOpen } from '../hooks/useKeyboardOpen.js';
+import { useWallpaper } from '../context/WallpaperContext.jsx';
 import {
   parseEntryContent,
   serializeBlocks,
@@ -60,6 +61,7 @@ export default function ViewEntry() {
   const [uploadStatus, setUploadStatus] = useState('');
   // Hide footer + toolbar while typing so text stays clearly visible
   const keyboardOpen = useKeyboardOpen();
+  const { topInk, topMuted } = useWallpaper();
 
   // Guards the background media merge below (avoids touching blocks mid-edit)
   const editingRef = useRef(false);
@@ -274,9 +276,9 @@ export default function ViewEntry() {
         <button
           onClick={() => navigate('/dashboard')}
           className="flex items-center gap-1.5 text-sm mb-3 flex-shrink-0 self-start transition-colors cursor-pointer"
-          style={{ color: 'var(--text-muted)' }}
+          style={{ color: topMuted }}
           onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--gold)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = topMuted; }}
         >
           <ArrowLeft className="w-4 h-4" />
           Back to diary
@@ -301,11 +303,11 @@ export default function ViewEntry() {
             style={{ borderBottom: '1px solid var(--border-color)' }}
           >
             <div className="flex flex-wrap items-center gap-2 mb-3">
-              <span className="text-[11px] sm:text-xs uppercase tracking-widest font-medium" style={{ color: 'var(--text-muted)' }}>
+              <span className="text-[11px] sm:text-xs uppercase tracking-widest font-medium" style={{ color: topMuted }}>
                 {formatDate(createdAtDate)} · {formatTime(createdAtDate)}
               </span>
               {wordCount > 0 && !editing && (
-                <span className="text-xs" style={{ color: 'var(--text-ghost)' }}>
+                <span className="text-xs" style={{ color: topMuted }}>
                   · {wordCount} {wordCount === 1 ? 'word' : 'words'}
                 </span>
               )}
@@ -331,7 +333,7 @@ export default function ViewEntry() {
                 maxLength={200}
                 className="w-full outline-none bg-transparent font-display text-2xl sm:text-3xl"
                 style={{
-                  color: 'var(--text-primary)',
+                  color: topInk,
                   fontWeight: 400,
                   borderBottom: '1px solid var(--border-bright)',
                   paddingBottom: '4px',
@@ -340,7 +342,7 @@ export default function ViewEntry() {
             ) : (
               <h1
                 className="font-display text-2xl sm:text-3xl leading-snug"
-                style={{ color: 'var(--text-primary)', fontWeight: 400 }}
+                style={{ color: topInk, fontWeight: 400 }}
               >
                 {title || 'Untitled Entry'}
               </h1>
