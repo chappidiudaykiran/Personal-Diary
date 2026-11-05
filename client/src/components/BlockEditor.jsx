@@ -231,6 +231,8 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
       );
       continue;
     }
+    // Defensive: media with neither an attached file nor a saved id renders nothing
+    if (!block.file && !block.mediaId) continue;
     const width = clampAsideWidth(block.width ?? 38);
     const isSelected = selectedKey === block.key;
     const nextBlock = i + 1 < blocks.length ? blocks[i + 1] : null;

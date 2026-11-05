@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -11,8 +11,10 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { encrypt } from '../crypto/cryptoUtils.js';
 import { useAutoSave } from '../hooks/useAutoSave.js';
 import { useKeyboardOpen } from '../hooks/useKeyboardOpen.js';
+import { saveDraftBlobs, loadDraftBlobs, clearDraftBlobs } from '../utils/draftMediaStore.js';
 import {
   createTextBlock,
+  createMediaBlock,
   serializeBlocks,
   countBlockWords,
   blocksToPlainText,
@@ -23,7 +25,7 @@ import {
 } from '../utils/entryBlocks.js';
 
 export default function NewEntry() {
-  const { cryptoKey } = useAuth();
+  const { cryptoKey, user } = useAuth();
   const navigate = useNavigate();
   const [title, setTitle] = useState('');
   const [blocks, setBlocks] = useState(() => normalizeBlocks([createTextBlock('')]));
@@ -32,28 +34,105 @@ export default function NewEntry() {
   const [saving, setSaving] = useState(false);
   // While the keyboard is open, hide footer + editor toolbar so typed text is fully visible
   const keyboardOpen = useKeyboardOpen();
+  // Gated so the blob persist below never wipes IndexedDB before restore lands
+  const [restoreSettled, setRestoreSettled] = useState(false);
 
-  // Autosave draft (title + text blocks + mood). Pending image files
-  // can't be stored in localStorage, so they are skipped on restore.
+  const userId = user?.id || user?._id || 'guest';
+  const draftKey = `diary_draft_${userId}_new_entry`;
+
+  // Autosave draft: text/title/mood -> localStorage, pending image blobs -> IndexedDB.
   const draftContent = useMemo(() => blocksToDraftString(blocks), [blocks]);
 
-  const handleRestore = useCallback((parsed) => {
-    if (parsed?.title) setTitle(parsed.title);
-    if (parsed?.mood) setMood(parsed.mood);
-    if (parsed?.content) {
-      const restored = draftStringToBlocks(parsed.content);
-      if (restored) {
-        const list = restored.blocks || restored;
-        const skipped = restored.skippedFiles || 0;
-        setBlocks(Array.isArray(list) ? list : normalizeBlocks([createTextBlock('')]));
-        if (skipped > 0) {
-          toast(`Draft restored — ${skipped} image${skipped === 1 ? '' : 's'} need re-adding`, { icon: '🖼️' });
-        } else {
-          toast.success('Draft restored');
+  const handleRestore = useCallback(async (parsed) => {
+    try {
+      if (parsed?.title) setTitle(parsed.title);
+      if (parsed?.mood) setMood(parsed.mood);
+      if (parsed?.content) {
+        const restored = draftStringToBlocks(parsed.content);
+        if (restored) {
+          let list = restored.blocks || [];
+          const pending = restored.pending || [];
+          if (pending.length > 0) {
+            let matched = 0;
+            try {
+              const blobs = await loadDraftBlobs(draftKey);
+              const byId = new Map((blobs || []).map((b) => [b.id, b]));
+              list = list
+                .map((b) => {
+                  if (b.type === 'media' && b.pendingId) {
+                    const hit = byId.get(b.pendingId);
+                    if (hit?.blob) {
+                      const file =
+                        hit.blob instanceof File
+                          ? hit.blob
+                          : new File([hit.blob], hit.name || b.pendingName || 'file', hit.type ? { type: hit.type } : undefined);
+                      matched++;
+                      return createMediaBlock({ file, layout: b.layout, width: b.width });
+                    }
+                    return null; // blob gone — drop marker
+                  }
+                  return b;
+                })
+                .filter(Boolean);
+            } catch (_) {
+              list = list.filter((b) => !(b.type === 'media' && b.pendingId));
+            }
+            if (matched === pending.length) {
+              toast.success(`Draft restored with ${matched} image${matched === 1 ? '' : 's'} ✨`);
+            } else if (matched > 0) {
+              toast(`Draft restored — ${pending.length - matched} image${pending.length - matched === 1 ? '' : 's'} need re-adding`, { icon: '🖼️' });
+            } else {
+              toast(`Draft restored — ${pending.length} image${pending.length === 1 ? '' : 's'} need re-adding`, { icon: '🖼️' });
+            }
+          } else {
+            toast.success('Draft restored');
+          }
+          setBlocks(normalizeBlocks(list.length ? list : [createTextBlock('')]));
         }
       }
+    } finally {
+      setRestoreSettled(true);
     }
+  }, [draftKey]);
+
+  // Fallback: if there was no draft to restore, unblock blob persisting shortly after mount
+  useEffect(() => {
+    const t = setTimeout(() => setRestoreSettled(true), 1500);
+    return () => clearTimeout(t);
   }, []);
+
+  // Persist pending file blobs to IndexedDB (debounced). Rewrites the whole set,
+  // so removing an image also removes its blob. Keyed on file identity only —
+  // typing text does not rewrite blobs.
+  const pendingSig = useMemo(
+    () =>
+      blocks
+        .filter((b) => b.type === 'media' && b.file)
+        .map((b) => `${b.tempId || b.key}:${b.file.name}:${b.file.size}:${b.file.lastModified}`)
+        .join('|'),
+    [blocks]
+  );
+
+  useEffect(() => {
+    if (!restoreSettled) return;
+    const pend = blocks.filter((b) => b.type === 'media' && b.file);
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        if (!cancelled) {
+          await saveDraftBlobs(
+            draftKey,
+            pend.map((b) => ({ id: b.tempId || b.key, file: b.file }))
+          );
+        }
+      } catch (_) {}
+    }, 600);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingSig, draftKey, restoreSettled]);
 
   const {
     autoSaveEnabled,
@@ -67,6 +146,11 @@ export default function NewEntry() {
     data: { title, content: draftContent, mood },
     onRestore: handleRestore,
   });
+
+  const handleDiscardDraft = useCallback(() => {
+    clearDraft();
+    clearDraftBlobs(draftKey).catch(() => {});
+  }, [clearDraft, draftKey]);
 
   const wordCount = countBlockWords(blocks);
   const charCount = blocksToPlainText(blocks).length;
@@ -139,6 +223,7 @@ export default function NewEntry() {
         toast.success('Entry saved ✨');
       }
       clearDraft();
+      try { await clearDraftBlobs(draftKey); } catch (_) {}
       navigate(`/entry/${entryId}`);
     } catch (err) {
       toast.error('Failed to save entry. Please try again.');
@@ -277,7 +362,7 @@ export default function NewEntry() {
                 <span className="text-[11px]" style={{ color: 'var(--text-ghost)' }}>
                   {autoSaveStatus === 'saving' ? 'Saving draft…' : autoSaveStatus === 'saved' && lastSavedAt ? `Draft saved ${lastSavedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : autoSaveStatus === 'restored' || hasRestoredDraft ? 'Draft restored' : autoSaveStatus === 'disabled' ? 'Autosave off' : ''}
                   {hasRestoredDraft && (
-                    <button type="button" onClick={clearDraft} className="ml-2 underline cursor-pointer" style={{ color: 'var(--gold)' }}>
+                    <button type="button" onClick={handleDiscardDraft} className="ml-2 underline cursor-pointer" style={{ color: 'var(--gold)' }}>
                       Discard
                     </button>
                   )}

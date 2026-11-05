@@ -142,9 +142,9 @@ export function cloneBlocks(blocks) {
 }
 
 /**
- * Draft helpers for autosave (localStorage, plaintext).
- * File objects cannot be stored, so pending file blocks are saved as
- * markers ({t:'media-pending', name}) and skipped on restore.
+ * Draft helpers for autosave.
+ * Text/title/mood go to localStorage (plaintext); pending file blobs go to
+ * IndexedDB (see draftMediaStore) keyed by the marker id below.
  * Returns "" when there is nothing meaningful to save, so the
  * useAutoSave hasData check works.
  */
@@ -163,7 +163,13 @@ export function blocksToDraftString(blocks) {
         }
         out.push(item);
       } else if (block.file) {
-        const item = { t: 'media-pending', name: block.file.name || 'file' };
+        const item = {
+          t: 'media-pending',
+          id: block.tempId || block.key,
+          name: block.file.name || 'file',
+          size: block.file.size || 0,
+          type: block.file.type || '',
+        };
         if (layout === 'aside') {
           item.layout = 'aside';
           item.w = clampAsideWidth(block.width);
@@ -178,30 +184,54 @@ export function blocksToDraftString(blocks) {
   return JSON.stringify(out);
 }
 
-/** Restore blocks from a draft string. Pending files cannot be restored — skipped. */
+/**
+ * Restore blocks from a draft string.
+ * Pending-file markers are kept inline (preserving order) as media blocks
+ * with `pendingId`; the caller resolves them to real File objects via
+ * IndexedDB and drops markers whose blob is gone.
+ */
 export function draftStringToBlocks(draftStr) {
   if (!draftStr || !draftStr.trim()) return null;
   const trimmed = draftStr.trim();
   // Legacy plain-text draft
   if (!trimmed.startsWith('[')) {
-    return normalizeBlocks([createTextBlock(draftStr)]);
+    return { blocks: normalizeBlocks([createTextBlock(draftStr)]), skippedFiles: 0, pending: [] };
   }
   try {
     const parsed = JSON.parse(trimmed);
     if (!Array.isArray(parsed) || parsed.length === 0) return null;
     const blocks = [];
-    let skippedFiles = 0;
+    const pending = [];
     for (const b of parsed) {
       if (b?.t === 'text' && typeof b.v === 'string') {
         blocks.push(createTextBlock(b.v));
       } else if (b?.t === 'media' && typeof b.id === 'string') {
         blocks.push(createMediaBlock({ mediaId: b.id, layout: b.layout, width: b.w ?? b.width }));
       } else if (b?.t === 'media-pending') {
-        skippedFiles += 1;
+        const layout = normalizeLayout(b.layout);
+        const marker = {
+          id: b.id || null,
+          name: b.name || 'file',
+          type: b.type || '',
+          layout,
+          width: layout === 'aside' ? clampAsideWidth(b.w ?? b.width) : undefined,
+        };
+        pending.push(marker);
+        blocks.push({
+          type: 'media',
+          key: newBlockKey(),
+          mediaId: null,
+          file: null,
+          tempId: null,
+          pendingId: marker.id,
+          pendingName: marker.name,
+          layout,
+          width: marker.width,
+        });
       }
     }
     if (blocks.length === 0) return null;
-    return { blocks: normalizeBlocks(blocks), skippedFiles };
+    return { blocks: normalizeBlocks(blocks), skippedFiles: pending.length, pending };
   } catch (_) {
     return null;
   }
