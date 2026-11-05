@@ -1,6 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,300;1,9..144,400;1,9..144,600&family=Outfit:wght@300;400;500;600;700&display=swap');
 @import 'tailwindcss';
 
+/* App toggles .dark/.light on <html> itself, so make Tailwind's
+   `dark:` variant follow that class instead of the OS preference. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --font-family-display: 'Fraunces', Georgia, serif;
   --font-family-sans: 'Outfit', system-ui, sans-serif;
@@ -33,13 +37,13 @@
   --skeleton-bg: linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 100%);
 
   --wallpaper-scrim: rgba(12, 12, 23, 0.82);
+  --nav-hover: rgba(255, 255, 255, 0.08);
 }
 
 /* When a wallpaper is set, page backgrounds go transparent so the
    body wallpaper shows through; cards keep their solid gradients. */
 html.has-wallpaper {
   --bg-app: transparent;
-  --nav-bg: rgba(11, 11, 22, 0.6);
 }
 
 html.light {
@@ -71,11 +75,22 @@ html.light {
   --skeleton-bg: linear-gradient(90deg, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0.08) 50%, rgba(0,0,0,0.04) 100%);
 
   --wallpaper-scrim: rgba(250, 247, 242, 0.86);
+  --nav-hover: rgba(35, 32, 28, 0.07);
 }
 
 html.light.has-wallpaper {
   --bg-app: transparent;
-  --nav-bg: rgba(250, 247, 242, 0.65);
+}
+
+/* Navbar follows the wallpaper tone (not the theme) so its icons stay
+   visible. These come last so they win over the theme nav backgrounds. */
+html.wallpaper-dark {
+  --nav-bg: rgba(11, 11, 22, 0.6);
+  --nav-hover: rgba(255, 255, 255, 0.1);
+}
+html.wallpaper-light {
+  --nav-bg: rgba(250, 247, 242, 0.88);
+  --nav-hover: rgba(35, 32, 28, 0.07);
 }
 
 @layer base {
@@ -118,6 +133,16 @@ html.light.has-wallpaper {
   input, button {
     font-family: inherit;
   }
+}
+
+/* Navbar icon buttons: solid ink color + theme-aware hover wash so
+   small lucide icons never wash out in light mode. */
+.nav-icon-btn:hover {
+  background: var(--nav-hover);
+}
+.nav-icon-btn.danger:hover {
+  background: rgba(224, 85, 85, 0.12);
+  color: #e05555;
 }
 
 @keyframes fadeUp {

@@ -135,32 +135,46 @@ export function WallpaperProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Apply wallpaper to the page behind the app
+  // Wallpaper tone drives top-text contrast. null = no wallpaper (follow theme).
+  const preset = PRESET_WALLPAPERS.find((p) => p.id === wallpaper);
+  const tone = wallpaper === 'none' ? null : wallpaper === 'custom' ? stored.customTone : preset?.tone || 'dark';
+  // Ink colors for text sitting directly on the wallpaper.
+  // NOTE: muted values stay fairly opaque so small navbar icons keep
+  // enough contrast on bright wallpapers / light theme.
+  const topInk = !tone ? 'var(--text-primary)' : tone === 'light' ? '#23201c' : '#f5efe4';
+  const topMuted = !tone ? 'var(--text-muted)' : tone === 'light' ? 'rgba(35,32,28,0.8)' : 'rgba(245,239,228,0.85)';
+  const topGold = !tone ? 'var(--gold)' : tone === 'light' ? '#8a5a12' : '#e0aa4e';
+
+  // Apply wallpaper to the page behind the app. Navbar tone follows the
+  // wallpaper (not the theme) so icons stay visible on it.
   useEffect(() => {
     const root = document.documentElement;
     const body = document.body;
     const active = PRESET_WALLPAPERS.find((p) => p.id === wallpaper);
 
+    let image = null;
     if (wallpaper === 'custom' && customUrl) {
-      root.classList.add('has-wallpaper');
-      body.style.backgroundImage = `linear-gradient(var(--wallpaper-scrim), var(--wallpaper-scrim)), url("${customUrl}")`;
-      body.style.backgroundSize = 'cover';
-      body.style.backgroundPosition = 'center';
-      body.style.backgroundAttachment = 'fixed';
+      image = `linear-gradient(var(--wallpaper-scrim), var(--wallpaper-scrim)), url("${customUrl}")`;
     } else if (active && active.css) {
+      image = active.css;
+    }
+
+    if (image) {
       root.classList.add('has-wallpaper');
-      body.style.backgroundImage = active.css;
+      root.classList.toggle('wallpaper-light', tone === 'light');
+      root.classList.toggle('wallpaper-dark', tone !== 'light');
+      body.style.backgroundImage = image;
       body.style.backgroundSize = 'cover';
       body.style.backgroundPosition = 'center';
       body.style.backgroundAttachment = 'fixed';
     } else {
-      root.classList.remove('has-wallpaper');
+      root.classList.remove('has-wallpaper', 'wallpaper-light', 'wallpaper-dark');
       body.style.backgroundImage = '';
       body.style.backgroundSize = '';
       body.style.backgroundPosition = '';
       body.style.backgroundAttachment = '';
     }
-  }, [wallpaper, customUrl]);
+  }, [wallpaper, customUrl, tone]);
 
   const setWallpaper = useCallback((id) => {
     const next = isValidId(id) ? id : 'none';
@@ -209,14 +223,6 @@ export function WallpaperProvider({ children }) {
       return { ...prev, id: 'none' };
     });
   }, []);
-
-  // Wallpaper tone drives top-text contrast. null = no wallpaper (follow theme).
-  const preset = PRESET_WALLPAPERS.find((p) => p.id === wallpaper);
-  const tone = wallpaper === 'none' ? null : wallpaper === 'custom' ? stored.customTone : preset?.tone || 'dark';
-  // Ink colors for text sitting directly on the wallpaper.
-  const topInk = !tone ? 'var(--text-primary)' : tone === 'light' ? '#23201c' : '#f5efe4';
-  const topMuted = !tone ? 'var(--text-muted)' : tone === 'light' ? 'rgba(35,32,28,0.66)' : 'rgba(245,239,228,0.72)';
-  const topGold = !tone ? 'var(--gold)' : tone === 'light' ? '#8a5a12' : '#e0aa4e';
 
   return (
     <WallpaperContext.Provider

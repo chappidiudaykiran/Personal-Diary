@@ -65,28 +65,28 @@ export default function Navbar() {
             {/* Theme toggle */}
             <button
               onClick={toggleTheme}
-              className="p-2 rounded-lg transition-all duration-150 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
-              style={{ color: topMuted }}
+              className="nav-icon-btn p-2 rounded-lg transition-all duration-150 cursor-pointer"
+              style={{ color: topInk }}
               title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
             >
-              {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-amber-700" />}
+              {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" style={{ color: '#8a5a12' }} />}
             </button>
 
             {/* Wallpaper */}
             <button
               onClick={() => setShowWallpaper(true)}
-              className="p-2 rounded-lg transition-all duration-150 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
-              style={{ color: topMuted }}
+              className="nav-icon-btn p-2 rounded-lg transition-all duration-150 cursor-pointer"
+              style={{ color: topInk }}
               title="Change wallpaper"
             >
-              <Image className="w-4 h-4" />
+              <Image className="w-4 h-4" style={{ color: 'currentColor' }} />
             </button>
 
             {/* Lock Button */}
             <button
               onClick={handleLock}
-              className="p-2 rounded-lg transition-all duration-150 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
-              style={{ color: topMuted }}
+              className="nav-icon-btn p-2 rounded-lg transition-all duration-150 cursor-pointer"
+              style={{ color: topInk }}
               title={hasPin ? 'Lock Diary' : 'Set PIN Lock'}
             >
               {hasPin ? <Lock className="w-4 h-4 text-amber-500" /> : <KeyRound className="w-4 h-4" />}
@@ -119,8 +119,8 @@ export default function Navbar() {
             {/* Logout */}
             <button
               onClick={handleLogout}
-              className="p-1.5 rounded-lg transition-all duration-150 hover:bg-red-500/10 hover:text-red-500 cursor-pointer"
-              style={{ color: topMuted }}
+              className="nav-icon-btn danger p-1.5 rounded-lg transition-all duration-150 cursor-pointer"
+              style={{ color: topInk }}
               title="Sign out"
             >
               <LogOut className="w-4 h-4" />
