@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 
 const DEFAULT_AUTOSAVE_PREF_KEY = 'diary_autosave_enabled';
 
-export function useAutoSave({ draftId = 'new_entry', data = {}, onRestore }) {
+export function useAutoSave({ draftId = 'new_entry', data = {} }) {
   const { user } = useAuth();
   const userId = user?.id || user?._id || 'guest';
   const storageKey = `diary_draft_${userId}_${draftId}`;
@@ -21,10 +21,12 @@ export function useAutoSave({ draftId = 'new_entry', data = {}, onRestore }) {
   const [lastSavedAt, setLastSavedAt] = useState(null);
   const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
 
-  const isInitializedRef = useRef(false);
   // Set by clearDraft() so the unmount/beforeunload save below does not
   // resurrect a draft that was just saved or discarded.
   const suppressSaveRef = useRef(false);
+  // Skip the very first autosave run so a just-restored draft isn't
+  // pointlessly rewritten (and 'restored' status isn't clobbered) on mount.
+  const firstRunRef = useRef(true);
   const dataRef = useRef(data);
   dataRef.current = data;
 
@@ -76,34 +78,19 @@ export function useAutoSave({ draftId = 'new_entry', data = {}, onRestore }) {
     }
   }, [storageKey]);
 
-  // 1. Initial check and restore existing draft on mount
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(storageKey);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed && (parsed.title?.trim() || parsed.content?.trim() || parsed.mood)) {
-          setHasRestoredDraft(true);
-          setLastSavedAt(parsed.savedAt ? new Date(parsed.savedAt) : new Date());
-          setStatus('restored');
-          if (onRestore) {
-            onRestore(parsed);
-          }
-        }
-      }
-    } catch (e) {
-      console.error('Failed to load auto-saved draft', e);
-    } finally {
-      // Mark initialization complete after restoration callback has fired
-      setTimeout(() => {
-        isInitializedRef.current = true;
-      }, 150);
-    }
-  }, [storageKey]); // Run on mount / storageKey change
+  // Called by the screen after it synchronously restores a draft into state.
+  const markRestored = useCallback((savedAt) => {
+    setHasRestoredDraft(true);
+    setLastSavedAt(savedAt ? new Date(savedAt) : new Date());
+    setStatus('restored');
+  }, []);
 
-  // 2. Debounced auto-save effect when data changes
+  // Debounced auto-save effect when data changes
   useEffect(() => {
-    if (!isInitializedRef.current) return;
+    if (firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
 
     if (!autoSaveEnabled) {
       setStatus('disabled');
@@ -128,10 +115,10 @@ export function useAutoSave({ draftId = 'new_entry', data = {}, onRestore }) {
     return () => clearTimeout(timer);
   }, [data.title, data.content, data.mood, autoSaveEnabled, saveNow]);
 
-  // 3. Save draft immediately on window unload (closing tab or refreshing) or unmount
+  // Save draft immediately on window unload (closing tab or refreshing) or unmount
   useEffect(() => {
     const handleBeforeUnload = () => {
-      if (autoSaveEnabled && isInitializedRef.current) {
+      if (autoSaveEnabled) {
         saveNow(dataRef.current);
       }
     };
@@ -140,7 +127,7 @@ export function useAutoSave({ draftId = 'new_entry', data = {}, onRestore }) {
 
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      if (autoSaveEnabled && isInitializedRef.current) {
+      if (autoSaveEnabled) {
         saveNow(dataRef.current);
       }
     };
@@ -155,5 +142,7 @@ export function useAutoSave({ draftId = 'new_entry', data = {}, onRestore }) {
     clearDraft,
     setHasRestoredDraft,
     saveNow,
+    markRestored,
+    storageKey,
   };
 }
