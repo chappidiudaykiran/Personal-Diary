@@ -74,6 +74,7 @@ html.light {
 }
 
 html.light.has-wallpaper {
+  --bg-app: transparent;
   --nav-bg: rgba(250, 247, 242, 0.65);
 }
 
