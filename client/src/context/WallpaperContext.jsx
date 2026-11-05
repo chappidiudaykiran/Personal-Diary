@@ -7,7 +7,7 @@ import {
 } from '../utils/wallpaperStore.js';
 
 const STORAGE_KEY = 'diary_wallpaper';
-const MAX_CUSTOM_BYTES = 5 * 1024 * 1024;
+const MAX_CUSTOM_BYTES = 10 * 1024 * 1024;
 
 export const PRESET_WALLPAPERS = [
   { id: 'none', name: 'Default', css: null },
@@ -110,7 +110,7 @@ export function WallpaperProvider({ children }) {
       return false;
     }
     if (file.size > MAX_CUSTOM_BYTES) {
-      toast.error('Image is too large (max 5 MB)');
+      toast.error('Image is too large (max 10 MB)');
       return false;
     }
     try {

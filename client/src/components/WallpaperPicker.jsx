@@ -41,7 +41,7 @@ export default function WallpaperPicker({ isOpen, onClose }) {
           </button>
         </div>
         <p className="text-xs mb-4" style={{ color: 'var(--text-ghost)' }}>
-          Sits behind your diary. Cards stay readable on top.
+          Sits behind your diary. Cards stay readable on top. Photos up to 10 MB.
         </p>
 
         <div className="grid grid-cols-3 gap-2.5">
