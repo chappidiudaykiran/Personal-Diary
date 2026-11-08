@@ -32,6 +32,18 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        // Split heavy vendors so repeat visits use cached chunks
+        manualChunks(id) {
+          if (id.includes('node_modules/react-dom') || id.includes('node_modules/react-router') || id.includes('node_modules/react/')) return 'react';
+          if (id.includes('node_modules')) return 'vendor';
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     host: true, // Allows accessing from phone via local WiFi IP
