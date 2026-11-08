@@ -27,21 +27,39 @@ function AutoTextarea({ blockKey, value, onChange, onCursor, placeholder, disabl
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    // Auto-grow without flicker: lock overflow so no inner scrollbar fights typing
+    el.style.overflowY = 'hidden';
     el.style.height = 'auto';
     el.style.height = `${Math.max(el.scrollHeight, first ? 72 : 36)}px`;
   }, [value, first]);
   const trackCursor = (e) => onCursor(blockKey, e.target.selectionStart ?? value.length);
-  // Keep the focused line visible above the sticky Media bar + keyboard
-  const scrollIntoView = (el) => {
+  // Keep caret visible with minimal, instant adjustment — never smooth/center,
+  // which queues animations on every keystroke and makes text jump/disappear.
+  const ensureVisible = (el) => {
     try {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const scroller = el.closest('.overflow-y-auto');
+      if (!scroller) {
+        el.scrollIntoView({ behavior: 'auto', block: 'nearest' });
+        return;
+      }
+      const r = el.getBoundingClientRect();
+      const sr = scroller.getBoundingClientRect();
+      // Only nudge when the textarea bottom is actually hidden behind
+      // the sticky bar / keyboard area. No animation so typing stays stable.
+      if (r.bottom > sr.bottom - 24) {
+        scroller.scrollTop += r.bottom - (sr.bottom - 24) + 8;
+      }
     } catch (_) {}
   };
   const handleFocus = (e) => {
     trackCursor(e);
     const el = e.currentTarget;
-    // Wait for mobile keyboard to open, then center the field
-    setTimeout(() => scrollIntoView(el), 300);
+    // Wait for mobile keyboard to settle, then nudge minimally (no centering)
+    setTimeout(() => {
+      try {
+        if (document.activeElement === el) ensureVisible(el);
+      } catch (_) {}
+    }, 300);
   };
   return (
     <textarea
@@ -52,14 +70,10 @@ function AutoTextarea({ blockKey, value, onChange, onCursor, placeholder, disabl
       onChange={(e) => {
         onChange(e.target.value);
         trackCursor(e);
-        // Typing at the end: keep caret above the sticky bar
-        const el = e.currentTarget;
-        requestAnimationFrame(() => {
-          try {
-            const nearEnd = (el.selectionStart ?? 0) >= (el.value?.length ?? 0) - 2;
-            if (nearEnd && document.activeElement === el) scrollIntoView(el);
-          } catch (_) {}
-        });
+        // No auto-scroll while typing: the browser already keeps the caret
+        // visible inside the textarea. Only the outer scroll container may
+        // need a tiny nudge, and only if the caret left the viewport.
+        // Intentionally no scrollIntoView here to avoid glitch/jump.
       }}
       onFocus={handleFocus}
       onSelect={trackCursor}
@@ -68,7 +82,13 @@ function AutoTextarea({ blockKey, value, onChange, onCursor, placeholder, disabl
       placeholder={placeholder}
       rows={1}
       className="w-full outline-none bg-transparent text-sm sm:text-base leading-[1.9] font-sans py-1"
-      style={{ color: 'var(--text-body)', minHeight: first ? '4.5rem' : '2.25rem' }}
+      style={{
+        color: 'var(--text-body)',
+        minHeight: first ? '4.5rem' : '2.25rem',
+        overflowY: 'hidden',
+        overflowAnchor: 'none',
+        scrollMarginBottom: '24px',
+      }}
     />
   );
 }
@@ -109,7 +129,15 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
   useEffect(() => {
     if (!focusKeyRef.current) return;
     const el = document.querySelector(`textarea[data-block-key="${focusKeyRef.current}"]`);
-    if (el) { el.focus(); el.setSelectionRange(0, 0); focusKeyRef.current = null; }
+    if (el) {
+      // Focus without jumping, place caret at end so continued typing is visible
+      try { el.focus({ preventScroll: true }); } catch (_) { el.focus(); }
+      try {
+        const end = el.value?.length ?? 0;
+        el.setSelectionRange(end, end);
+      } catch (_) {}
+      focusKeyRef.current = null;
+    }
   }, [blocks]);
 
   useEffect(() => {
@@ -308,8 +336,9 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
     <div className="flex flex-col min-h-full">
       <div className="flex-1">
         {rendered}
-        {/* Spacer so the last line can scroll above the sticky Media bar */}
-        {!hideToolbar && <div className="h-24 sm:h-20" aria-hidden="true" />}
+        {/* Spacer so the last line can scroll above the sticky Media bar.
+            Always rendered so hiding the toolbar doesn't shift layout / hide text. */}
+        <div className="h-24 sm:h-20" aria-hidden="true" />
       </div>
 
       {!hideToolbar && (
