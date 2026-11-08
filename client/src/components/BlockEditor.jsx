@@ -239,8 +239,8 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
     window.addEventListener('touchmove', onMove, { passive: false }); window.addEventListener('touchend', onUp);
   };
 
-  // Group media + immediate next text so typing continues on right side by default.
-  // Next standalone text blocks render full-width below the image.
+  // Media on top, its immediate next text below full-width from the left edge.
+  // No narrow side column, so text never gets stuck beside the image.
   const rendered = [];
   for (let i = 0; i < blocks.length; i++) {
     const block = blocks[i];
@@ -303,10 +303,10 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
 
     rendered.push(
       <div key={block.key} data-media-block className="relative my-2">
-        <div className="flex items-start gap-3">
+        <div className="flex flex-col gap-2">
           {mediaBox}
           {hasNextText ? (
-            <div className="flex-1 min-w-0">
+            <div className="w-full">
               <AutoTextarea
                 key={nextBlock.key}
                 blockKey={nextBlock.key}

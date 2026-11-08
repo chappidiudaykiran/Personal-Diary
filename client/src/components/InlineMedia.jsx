@@ -89,8 +89,7 @@ export function InlineMedia({ cryptoKey, mediaId, layout = 'aside', width = 38, 
 }
 
 /**
- * Read-only rendering: media wraps on left, text continues on right side.
- * Next line (next standalone text block) starts below image (clear).
+ * Read-only rendering: media on top, text below full-width from the left edge.
  */
 export default function EntryContent({ blocks, cryptoKey, metas = null }) {
   const nodes = [];
@@ -109,7 +108,7 @@ export default function EntryContent({ blocks, cryptoKey, metas = null }) {
     } else if (block.type === 'media' && block.mediaId) {
       const width = clampAsideWidth(block.width);
       // Text that was before media stays above (already in flow flushed as separate paragraph)
-      // For wrapping, we want media left and immediate next text on right side.
+      // Media on top, immediate next text below full-width.
       let rightText = [];
       if (i + 1 < (blocks || []).length && blocks[i + 1].type === 'text' && blocks[i + 1].text?.trim()) {
         rightText = [<span key={blocks[i + 1].key}>{blocks[i + 1].text}</span>];
@@ -117,13 +116,13 @@ export default function EntryContent({ blocks, cryptoKey, metas = null }) {
       }
       // If there was accumulated flow before media, flush it above first (not beside)
       if (flow.length > 0) { flushFlow(); }
-      // Now render media wrap row: image left, right text beside it. Next flow after this will be below (clears)
+      // Media on top, text below full-width from the left edge
       nodes.push(
-        <div key={`wrap-${block.key}`} className="flex flex-col sm:flex-row gap-4 my-3 items-start">
-          <div className="flex-shrink-0 w-full sm:w-auto" style={{ width: `min(${width}%, 100%)`, maxWidth: `${width}%`, minWidth: '140px' }}>
+        <div key={`wrap-${block.key}`} className="flex flex-col gap-2 my-3 items-stretch">
+          <div className="flex-shrink-0 self-start" style={{ width: `${width}%`, maxWidth: '100%', minWidth: '140px' }}>
             <InlineMedia cryptoKey={cryptoKey} mediaId={block.mediaId} width={width} meta={metas?.[block.mediaId] || null} />
           </div>
-          <div className="flex-1 min-w-0 font-sans text-sm sm:text-base leading-[1.95] whitespace-pre-wrap" style={{ color: 'var(--text-body)' }}>
+          <div className="w-full font-sans text-sm sm:text-base leading-[1.95] whitespace-pre-wrap" style={{ color: 'var(--text-body)' }}>
             {rightText.length > 0 ? rightText : <span className="text-xs italic" style={{ color: 'var(--text-ghost)' }}></span>}
           </div>
         </div>
