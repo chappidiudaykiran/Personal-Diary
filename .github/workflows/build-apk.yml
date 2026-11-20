@@ -13,6 +13,8 @@ on:
 jobs:
   apk:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -64,3 +66,10 @@ jobs:
         with:
           name: diary-debug-apk
           path: client/android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Public download link (release)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-debug
+          name: Diary debug APK
+          files: client/android/app/build/outputs/apk/debug/app-debug.apk
