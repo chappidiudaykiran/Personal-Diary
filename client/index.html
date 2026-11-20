@@ -42,8 +42,10 @@
     </div>
     <div id="root"></div>
     <script>
-      // If the app code can't download (dead/slow network), don't sit on a
-      // frozen logo — offer a retry that reloads from the offline cache.
+      // If the app code can't download (dead/slow network, or a stale
+      // cached page from before an update), don't sit on a frozen logo —
+      // offer a retry that first purges the service worker + caches, then
+      // reloads fresh from the network.
       setTimeout(function () {
         if (window.__app_mounted) return;
         var m = document.getElementById('boot-msg');
@@ -51,7 +53,30 @@
         var b = document.getElementById('boot-retry');
         if (b) {
           b.hidden = false;
-          b.onclick = function () { window.location.reload(); };
+          b.onclick = function () {
+            b.disabled = true;
+            if (m) m.textContent = 'Clearing stuck cache…';
+            var done = function () { window.location.reload(); };
+            try {
+              var jobs = [];
+              if ('serviceWorker' in navigator) {
+                jobs.push(
+                  navigator.serviceWorker.getRegistrations().then(function (rs) {
+                    return Promise.all(rs.map(function (r) { return r.unregister().catch(function () {}); }));
+                  }).catch(function () {})
+                );
+              }
+              if ('caches' in window) {
+                jobs.push(
+                  caches.keys().then(function (keys) {
+                    return Promise.all(keys.map(function (k) { return caches.delete(k).catch(function () {}); }));
+                  }).catch(function () {})
+                );
+              }
+              Promise.all(jobs).then(done, done);
+              setTimeout(done, 3000);
+            } catch (_) { done(); }
+          };
         }
       }, 10000);
     </script>
