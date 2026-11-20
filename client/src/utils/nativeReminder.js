@@ -74,40 +74,46 @@ export async function getNativePermission() {
   }
 }
 
-/** Schedule (or reschedule) the daily native notification. */
-export async function scheduleNativeDaily(time) {
+const NATIVE_BASE_ID = 9001;
+const NATIVE_MAX = 10;
+
+function nativeIds() {
+  const ids = [{ id: 9002 }, { id: 9999 }]; // legacy + preview ids
+  for (let i = 0; i < NATIVE_MAX; i++) ids.push({ id: NATIVE_BASE_ID + i });
+  return ids;
+}
+
+/** Schedule (or reschedule) the native notifications — one per reminder time. */
+export async function scheduleNativeDaily(times) {
   const api = await ln();
   if (!api) return false;
   const allowed = await ensureNativePermission();
   if (!allowed) return false;
+  const list = (Array.isArray(times) ? times : [times])
+    .filter((t) => /^\d{2}:\d{2}$/.test(t || ''))
+    .slice(0, NATIVE_MAX);
+  if (list.length === 0) return false;
   const name = username();
   try {
-    await withTimeout(
-      api.cancel({ notifications: [{ id: 9001 }, { id: 9002 }] }).catch(() => {}),
-      8000
-    );
-    const [hh, mm] = (time || '21:00').split(':').map(Number);
-    await withTimeout(
-      api.schedule({
-        notifications: [
-          {
-            id: 9001,
-            title: name ? `Hey ${name}, time to write` : 'My Diary',
-            body: name
-              ? `${name}, take a minute to write today's entry.`
-              : "Take a minute to write today's entry.",
-            schedule: {
-              // Repeat every day at the chosen time, even if the app is closed
-              on: { hour: Number(hh) || 0, minute: Number(mm) || 0 },
-              allowWhileIdle: true,
-            },
-            smallIcon: 'ic_launcher',
-            actionTypeId: 'OPEN_DIARY',
-          },
-        ],
-      }),
-      15000
-    );
+    await withTimeout(api.cancel({ notifications: nativeIds() }).catch(() => {}), 8000);
+    const notifications = list.map((time, i) => {
+      const [hh, mm] = time.split(':').map(Number);
+      return {
+        id: NATIVE_BASE_ID + i,
+        title: name ? `Hey ${name}, time to write` : 'My Diary',
+        body: name
+          ? `${name}, take a minute to write today's entry.`
+          : "Take a minute to write today's entry.",
+        schedule: {
+          // Repeat every day at the chosen time, even if the app is closed
+          on: { hour: Number(hh) || 0, minute: Number(mm) || 0 },
+          allowWhileIdle: true,
+        },
+        smallIcon: 'ic_launcher',
+        actionTypeId: 'OPEN_DIARY',
+      };
+    });
+    await withTimeout(api.schedule({ notifications }), 15000);
     return true;
   } catch (e) {
     console.error('Native schedule failed:', e);
@@ -120,7 +126,7 @@ export async function cancelNativeDaily() {
   const api = await ln();
   if (!api) return;
   try {
-    await api.cancel({ notifications: [{ id: 9001 }, { id: 9002 }, { id: 9999 }] });
+    await api.cancel({ notifications: nativeIds() });
   } catch (_) {}
 }
 

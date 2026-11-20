@@ -1,29 +1,66 @@
 // ─── reminder.js ─────────────────────────────────────────────────────────────
 // Two layers:
 // 1. Server push (primary): device subscribes via PushManager; the backend
-//    tick worker (GitHub Actions cron -> /api/push/tick) delivers the daily
+//    tick worker (GitHub Actions cron -> /api/push/tick) delivers each
 //    reminder at the user's local time even when the app is closed.
 // 2. Local check (backup): while the app is open, checks every 30s and fires
-//    once/day via the service worker.
-// Settings persist in localStorage: { enabled, time: "HH:MM", lastFired: "YYYY-MM-DD" }.
+//    due reminders via the service worker.
+// Settings persist in localStorage: { enabled, times: ["HH:MM", ...],
+// fired: { "<YYYY-MM-DD>T<HH:MM>": true } }. Legacy single-time settings
+// ({ time, lastFired }) are migrated automatically.
 
 const KEY = 'diary_reminder_v1';
+export const MAX_REMINDERS = 10;
+
+const TIME_RE = /^\d{2}:\d{2}$/;
+
+function cleanTime(t) {
+  if (typeof t !== 'string') return null;
+  const m = t.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h < 0 || h > 23 || min < 0 || min > 59) return null;
+  return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+}
+
+/** Unique, sorted, capped list of "HH:MM" strings. */
+export function normalizeTimes(list) {
+  const seen = new Set();
+  for (const t of list || []) {
+    const c = cleanTime(t);
+    if (c) seen.add(c);
+  }
+  return [...seen].sort().slice(0, MAX_REMINDERS);
+}
 
 export function getReminderSettings() {
-  const fallback = { enabled: false, time: '21:00', lastFired: '' };
+  const fallback = { enabled: false, times: ['21:00'], fired: {} };
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return fallback;
     const parsed = JSON.parse(raw);
-    if (!/^\d{2}:\d{2}$/.test(parsed.time || '')) parsed.time = fallback.time;
-    return { ...fallback, ...parsed };
+    let times = normalizeTimes(parsed.times);
+    let fired = parsed.fired && typeof parsed.fired === 'object' ? parsed.fired : {};
+    // Migrate legacy single-time shape { time, lastFired }
+    if (times.length === 0 && cleanTime(parsed.time)) {
+      times = [cleanTime(parsed.time)];
+      if (parsed.lastFired) {
+        fired = { ...fired, [`${parsed.lastFired}T${times[0]}`]: true };
+      }
+    }
+    if (times.length === 0) times = ['21:00'];
+    return { enabled: Boolean(parsed.enabled), times, fired };
   } catch (_) {
     return fallback;
   }
 }
 
 export function saveReminderSettings(settings) {
-  const next = { ...getReminderSettings(), ...settings };
+  const current = getReminderSettings();
+  const next = { ...current, ...settings };
+  if (settings.times !== undefined) next.times = normalizeTimes(settings.times);
+  if (next.times.length === 0) next.times = ['21:00'];
   try {
     localStorage.setItem(KEY, JSON.stringify(next));
   } catch (_) {}
@@ -37,21 +74,67 @@ export function todayKey(date = new Date()) {
   return `${y}-${m}-${d}`;
 }
 
-/** Milliseconds from now until today's reminder time (<=0 if passed). */
-export function msUntilFire(settings, now = new Date()) {
-  const [h, m] = (settings.time || '21:00').split(':').map(Number);
+function firedKey(day, time) {
+  return `${day}T${time}`;
+}
+
+/** Milliseconds from now until today's occurrence of `time` (<=0 if passed). */
+export function msUntilFire(settingsOrTime, now = new Date(), timeArg) {
+  let time;
+  if (typeof settingsOrTime === 'string') {
+    time = settingsOrTime;
+  } else {
+    time = timeArg || (settingsOrTime && settingsOrTime.times && settingsOrTime.times[0]) || settingsOrTime.time || '21:00';
+  }
+  const [h, m] = (time || '21:00').split(':').map(Number);
   const target = new Date(now);
   target.setHours(h || 0, m || 0, 0, 0);
   return target.getTime() - now.getTime();
 }
 
+/** All reminder times due right now that haven't fired yet today. */
+export function dueTimes(settings, now = new Date()) {
+  if (!settings || !settings.enabled) return [];
+  const day = todayKey(now);
+  const fired = settings.fired || {};
+  return (settings.times || []).filter((t) => {
+    if (!cleanTime(t)) return false;
+    if (fired[firedKey(day, t)]) return false;
+    return msUntilFire(t, now) <= 0;
+  });
+}
+
+export function markFiredTimes(times, now = new Date()) {
+  const settings = getReminderSettings();
+  const day = todayKey(now);
+  const fired = { ...(settings.fired || {}) };
+  for (const t of times || []) fired[firedKey(day, t)] = true;
+  return saveReminderSettings({ fired });
+}
+
+/** Single-time compat: is the (first) reminder due today? */
 export function shouldFireToday(settings, now = new Date()) {
-  if (!settings.enabled) return false;
-  return msUntilFire(settings, now) <= 0 && settings.lastFired !== todayKey(now);
+  return dueTimes(settings, now).length > 0;
 }
 
 export function markFiredToday() {
-  return saveReminderSettings({ lastFired: todayKey() });
+  const settings = getReminderSettings();
+  return markFiredTimes(settings.times);
+}
+
+/** Milliseconds until the next reminder (today or tomorrow). Null when disabled/empty. */
+export function nextDueMs(settings, now = new Date()) {
+  if (!settings || !settings.enabled) return null;
+  const times = settings.times || [];
+  if (times.length === 0) return null;
+  let best = null;
+  for (const t of times) {
+    if (!cleanTime(t)) continue;
+    let ms = msUntilFire(t, now);
+    if (ms <= 0) ms += 24 * 60 * 60 * 1000; // tomorrow's occurrence
+    if (best === null || ms < best) best = ms;
+  }
+  return best;
 }
 
 export function notificationState() {

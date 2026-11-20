@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, User, Bell, BellOff, Palette, ShieldCheck, KeyRound,
   Lock, LogOut, Save, Loader2, Image as ImageIcon, Sun, Moon, Trash2,
+  Plus, X,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar.jsx';
@@ -16,6 +17,8 @@ import { useWallpaper as useWallpaperColors } from '../context/WallpaperContext.
 import {
   getReminderSettings,
   saveReminderSettings,
+  normalizeTimes,
+  MAX_REMINDERS,
   notificationState,
   requestNotificationPermission,
   fireReminderNotification,
@@ -90,6 +93,7 @@ export default function Account() {
   const [showWallpaper, setShowWallpaper] = useState(false);
 
   const [reminder, setReminder] = useState(getReminderSettings);
+  const [newTime, setNewTime] = useState('21:00');
   const [perm, setPerm] = useState('default');
   const [testing, setTesting] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
@@ -104,7 +108,7 @@ export default function Account() {
       getNativePermission().then(setNativePerm).catch(() => {});
       const settings = getReminderSettings();
       if (settings.enabled) {
-        scheduleNativeDaily(settings.time).then((ok) => {
+        scheduleNativeDaily(settings.times).then((ok) => {
           setPhonePush(ok ? 'on' : 'off');
           getNativePermission().then(setNativePerm).catch(() => {});
         }).catch(() => setPhonePush('off'));
@@ -123,7 +127,7 @@ export default function Account() {
           if (data && data.count === 0) {
             const settings = getReminderSettings();
             if (settings.enabled && notificationState() === 'granted') {
-              await connectPhonePush(settings.time);
+              await connectPhonePush(settings.times);
             } else {
               setPhonePush('off');
             }
@@ -135,7 +139,7 @@ export default function Account() {
       const settings = getReminderSettings();
       if (settings.enabled && notificationState() === 'granted') {
         try {
-          await connectPhonePush(settings.time);
+          await connectPhonePush(settings.times);
           toast.success('This phone will get reminders ✅');
         } catch (_) {
           // Stays off — toggling the switch off/on retries (user gesture)
@@ -157,14 +161,46 @@ export default function Account() {
   }, []);
 
   /** Register this phone with the server for push reminders. */
-  const connectPhonePush = async (time) => {
+  const connectPhonePush = async (times) => {
     const sub = await subscribeDevicePush();
+    const list = normalizeTimes(times);
     await apiClient.post('/push/subscribe', {
       subscription: sub.toJSON(),
-      time: time || reminder.time,
+      times: list,
+      time: list[0] || '21:00', // fallback for older servers
       tzOffset: new Date().getTimezoneOffset(),
     });
     setPhonePush('on');
+  };
+
+  /** Push the current local times list to native scheduler / server. */
+  const syncTimes = async (list) => {
+    if (isNative()) {
+      if (reminder.enabled) {
+        try {
+          await scheduleNativeDaily(list);
+        } catch (_) {
+          toast.error("Couldn't update reminder times. Try again.");
+        }
+      }
+      return;
+    }
+    if (reminder.enabled) {
+      try {
+        const existing = await getPushSubscription();
+        if (!existing) {
+          await connectPhonePush(list);
+        } else {
+          await apiClient.put('/push/state', {
+            times: list,
+            time: list[0] || '21:00',
+            tzOffset: new Date().getTimezoneOffset(),
+          });
+        }
+      } catch (_) {
+        toast.error("Times saved on this phone, but not on your other devices. Check your internet and try again.");
+      }
+    }
   };
 
   const persistReminder = (next) => {
@@ -173,12 +209,12 @@ export default function Account() {
 
   const handleToggleReminder = async () => {
     if (pushBusy) return;
-    // ── Native APK path: OS-level daily notification (no web push in WebView)
+    // ── Native APK path: OS-level notifications (no web push in WebView)
     if (isNative()) {
       if (!reminder.enabled) {
         setPushBusy(true);
         try {
-          const ok = await scheduleNativeDaily(reminder.time);
+          const ok = await scheduleNativeDaily(reminder.times);
           if (!ok) {
             toast.error('Notifications are blocked. Allow them in phone Settings > Apps > Diary, then try again.');
             setPhonePush('off');
@@ -188,7 +224,7 @@ export default function Account() {
           setPhonePush('on');
           setNativePerm('granted');
           persistReminder({ enabled: true });
-          toast.success(`Daily reminder set for ${formatTime12(reminder.time)} ✅`);
+          toast.success(`Reminders set (${reminder.times.length}) ✅`);
         } catch (err) {
           console.error('Native reminder failed:', err);
           const reason = String(err?.message || '').slice(0, 90);
@@ -230,9 +266,9 @@ export default function Account() {
       }
       setPushBusy(true);
       try {
-        await connectPhonePush(reminder.time);
+        await connectPhonePush(reminder.times);
         persistReminder({ enabled: true });
-        toast.success(`Daily reminder set for ${formatTime12(reminder.time)} ✅`);
+        toast.success(`Reminders set (${reminder.times.length}) ✅`);
       } catch (err) {
         console.error('Enable reminder failed:', err);
         setPhonePush('unsupported');
@@ -260,32 +296,29 @@ export default function Account() {
     }
   };
 
-  const handleTimeChange = async (time) => {
-    const next = time || '21:00';
-    persistReminder({ time: next });
-    if (isNative()) {
-      if (reminder.enabled) {
-        try {
-          await scheduleNativeDaily(next);
-        } catch (_) {
-          toast.error("Couldn't update reminder time. Try again.");
-        }
-      }
+  const handleAddTime = async () => {
+    const list = normalizeTimes([...(reminder.times || []), newTime]);
+    if (list.length === (reminder.times || []).length) {
+      toast.error('That time is already in your list');
       return;
     }
-    if (reminder.enabled) {
-      try {
-        // If this phone was never registered (stale ON state), register it now
-        const existing = await getPushSubscription();
-        if (!existing) {
-          await connectPhonePush(next);
-        } else {
-          await apiClient.put('/push/state', { time: next, tzOffset: new Date().getTimezoneOffset() });
-        }
-      } catch (_) {
-        toast.error("Time saved on this phone, but not on your other devices. Check your internet and try again.");
-      }
+    if (list.length > MAX_REMINDERS) {
+      toast.error(`You can set up to ${MAX_REMINDERS} reminders`);
+      return;
     }
+    persistReminder({ times: list });
+    toast.success(`Reminder added for ${formatTime12(list[list.indexOf(newTime)] || newTime)} ✅`);
+    await syncTimes(list);
+  };
+
+  const handleRemoveTime = async (time) => {
+    const list = (reminder.times || []).filter((t) => t !== time);
+    if (list.length === 0) {
+      toast.error('Keep at least one reminder time, or turn reminders off');
+      return;
+    }
+    persistReminder({ times: list });
+    await syncTimes(list);
   };
 
   const handleRemoveDevice = async () => {
@@ -454,13 +487,13 @@ export default function Account() {
             </div>
           </Card>
 
-          {/* Daily reminder */}
-          <Card icon={Bell} title="Daily reminder">
+          {/* Reminders */}
+          <Card icon={Bell} title="Reminders">
             <Row
-              label="Remind me every day"
+              label="Remind me"
               hint={
                 reminder.enabled
-                  ? `Reminds you once a day at ${formatTime12(reminder.time)} · ${phonePush === 'on' ? 'On ✅' : phonePush === 'off' ? 'Off' : '…'}` 
+                  ? `${reminder.times.length} reminder${reminder.times.length === 1 ? '' : 's'}: ${reminder.times.map(formatTime12).join(', ')} · ${phonePush === 'on' ? 'On ✅' : phonePush === 'off' ? 'Off' : '…'}`
                   : 'Off'
               }
               right={
@@ -479,10 +512,10 @@ export default function Account() {
                 </button>
               }
             />
-            <div className="flex items-center gap-2 py-2.5">
+            <div className="py-2.5 space-y-2">
               <div className="flex-1">
                 <p className="text-sm" style={{ color: 'var(--text-primary)' }}>
-                  Reminder time · <span style={{ color: 'var(--gold)', fontWeight: 600 }}>{formatTime12(reminder.time)}</span>
+                  Reminder times · <span style={{ color: 'var(--gold)', fontWeight: 600 }}>{reminder.times.length} set</span>
                 </p>
                 <p className="text-[11px]" style={{ color: 'var(--text-ghost)' }}>
                   {nativeApp
@@ -490,13 +523,47 @@ export default function Account() {
                     : (perm === 'unsupported' ? "Can't show reminders here" : perm === 'denied' ? 'Blocked — turn on reminders in your browser settings' : perm === 'granted' ? 'Reminders allowed' : "We'll ask for permission when you turn it on")}
                 </p>
               </div>
-              <input
-                type="time"
-                value={reminder.time}
-                onChange={(e) => handleTimeChange(e.target.value)}
-                className="px-3 py-2 rounded-xl text-sm outline-none"
-                style={{ background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', colorScheme: isDark ? 'dark' : 'light' }}
-              />
+              {reminder.times.map((t) => (
+                <div
+                  key={t}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl"
+                  style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)' }}
+                >
+                  <Bell className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--gold)' }} />
+                  <span className="flex-1 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                    {formatTime12(t)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveTime(t)}
+                    className="p-1.5 rounded-lg cursor-pointer"
+                    style={{ color: 'var(--text-ghost)' }}
+                    aria-label={`Remove ${formatTime12(t)} reminder`}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+              {reminder.times.length < MAX_REMINDERS && (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="time"
+                    value={newTime}
+                    onChange={(e) => setNewTime(e.target.value || '21:00')}
+                    className="flex-1 px-3 py-2 rounded-xl text-sm outline-none"
+                    style={{ background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', colorScheme: isDark ? 'dark' : 'light' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddTime}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer flex-shrink-0"
+                    style={{ background: 'linear-gradient(135deg, #c4913a, #dba84a)', color: '#0c0c17' }}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add
+                  </button>
+                </div>
+              )}
             </div>
             {phonePush === 'on' && (
               <button

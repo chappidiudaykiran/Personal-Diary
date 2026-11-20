@@ -29,6 +29,11 @@ const pushSubscriptionSchema = new mongoose.Schema(
       type: String,
       default: '21:00',
     },
+    // Any number of reminder times ("HH:MM"). Tick prefers this over `time`.
+    times: {
+      type: [String],
+      default: ['21:00'],
+    },
     // new Date().getTimezoneOffset() at subscribe time (minutes, UTC - local)
     tzOffset: {
       type: Number,
@@ -42,6 +47,12 @@ const pushSubscriptionSchema = new mongoose.Schema(
     lastFiredDay: {
       type: String,
       default: '',
+    },
+    // Per-time delivery marks: "HH:MM" -> local "YYYY-MM-DD" last delivered
+    firedTimes: {
+      type: Map,
+      of: String,
+      default: {},
     },
   },
   { timestamps: true }

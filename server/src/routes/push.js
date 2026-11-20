@@ -18,6 +18,30 @@ if (VAPID_PUBLIC && VAPID_PRIVATE) {
 
 const isValidTime = (t) => /^\d{2}:\d{2}$/.test(t || '');
 
+// Unique, sorted, capped list of "HH:MM" strings. Returns [] when none valid.
+const MAX_TIMES = 10;
+function sanitizeTimes(input) {
+  if (!Array.isArray(input)) return [];
+  const seen = new Set();
+  for (const t of input) {
+    if (typeof t !== 'string') continue;
+    const m = t.match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) continue;
+    const h = Number(m[1]);
+    const min = Number(m[2]);
+    if (h < 0 || h > 23 || min < 0 || min > 59) continue;
+    seen.add(`${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`);
+  }
+  return [...seen].sort().slice(0, MAX_TIMES);
+}
+
+// Effective reminder times for a subscription (prefers `times`, falls back
+// to the legacy single `time`).
+function effectiveTimes(sub) {
+  if (Array.isArray(sub.times) && sub.times.length > 0) return sub.times;
+  return [isValidTime(sub.time) ? sub.time : '21:00'];
+}
+
 // ─── POST /api/push/subscribe ─────────────────────────────────────────────────
 // Body: { subscription: { endpoint, keys: { p256dh, auth } }, time, tzOffset }
 // Upserts the device subscription and (re)enables the daily reminder.
@@ -33,11 +57,18 @@ router.post(
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-    const { subscription, time, tzOffset } = req.body;
+    const { subscription, time, times, tzOffset } = req.body;
     if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
       return res.status(500).json({ message: 'Push not configured on server (VAPID keys missing)' });
     }
+    const list = sanitizeTimes(times);
+    if (list.length === 0 && isValidTime(time)) list.push(time);
+    if (list.length === 0) list.push('21:00');
     try {
+      const existing = await PushSubscription.findOne({ endpoint: subscription.endpoint });
+      const timesChanged =
+        !existing ||
+        JSON.stringify([...(existing.times || [])].sort()) !== JSON.stringify(list);
       const doc = await PushSubscription.findOneAndUpdate(
         { endpoint: subscription.endpoint },
         {
@@ -45,7 +76,9 @@ router.post(
           endpoint: subscription.endpoint,
           p256dh: subscription.keys.p256dh,
           auth: subscription.keys.auth,
-          time: isValidTime(time) ? time : '21:00',
+          time: list[0],
+          times: list,
+          ...(timesChanged ? { firedTimes: {}, lastFiredDay: '' } : {}),
           tzOffset: Number.isFinite(Number(tzOffset)) ? Number(tzOffset) : 0,
           enabled: true,
         },
@@ -60,16 +93,26 @@ router.post(
 );
 
 // ─── PUT /api/push/state ──────────────────────────────────────────────────────
-// Body: { enabled, time?, tzOffset? } — applies to all of the user's devices.
+// Body: { enabled, times?, time?, tzOffset? } — applies to all of the user's devices.
 router.put('/state', protect, async (req, res) => {
-  const { enabled, time, tzOffset } = req.body || {};
+  const { enabled, time, times, tzOffset } = req.body || {};
   try {
     const update = {};
     if (typeof enabled === 'boolean') update.enabled = enabled;
-    if (time !== undefined) {
+    if (times !== undefined) {
+      const list = sanitizeTimes(times);
+      if (list.length === 0) return res.status(400).json({ message: 'Invalid times (HH:MM)' });
+      update.times = list;
+      update.time = list[0];
+      // Changed times today should still fire — clear today's fired marks
+      update.firedTimes = {};
+      update.lastFiredDay = '';
+    } else if (time !== undefined) {
       if (!isValidTime(time)) return res.status(400).json({ message: 'Invalid time (HH:MM)' });
+      update.times = [time];
       update.time = time;
-      // New time today should still fire — clear today's already-fired mark
+      // New time today should still fire — clear today's already-fired marks
+      update.firedTimes = {};
       update.lastFiredDay = '';
     }
     if (tzOffset !== undefined && Number.isFinite(Number(tzOffset))) {
@@ -148,23 +191,35 @@ router.get('/tick', async (req, res) => {
       checked += 1;
       try {
         const { day, minutes } = localDayAndMinutes(now, sub.tzOffset || 0);
-        if (sub.lastFiredDay === day) continue; // already reminded today
-        if (minutes < toMinutes(sub.time)) continue; // not yet time
+        const fired = sub.firedTimes instanceof Map
+          ? sub.firedTimes
+          : new Map(Object.entries(sub.firedTimes || {}));
+        let changed = false;
+        for (const t of effectiveTimes(sub)) {
+          if (fired.get(t) === day) continue; // already reminded at this time today
+          // Legacy single-time mark counts too
+          if (sub.lastFiredDay === day && t === sub.time) continue;
+          if (minutes < toMinutes(t)) continue; // not yet time
 
-        const name = sub.userId?.username || 'friend';
-        const payload = JSON.stringify({
-          title: `Hey ${name}, time to write ✍️`,
-          body: `${name}, take a minute to write today\u2019s entry.`,
-          url: '/dashboard',
-        });
+          const name = sub.userId?.username || 'friend';
+          const payload = JSON.stringify({
+            title: `Hey ${name}, time to write ✍️`,
+            body: `${name}, take a minute to write today\u2019s entry.`,
+            url: '/dashboard',
+          });
 
-        await webpush.sendNotification(
-          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-          payload
-        );
-        sub.lastFiredDay = day;
-        await sub.save();
-        sent += 1;
+          await webpush.sendNotification(
+            { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+            payload
+          );
+          fired.set(t, day);
+          changed = true;
+          sent += 1;
+        }
+        if (changed) {
+          sub.firedTimes = fired;
+          await sub.save();
+        }
       } catch (err) {
         // 404/410 = subscription gone (uninstalled) — clean it up
         if (err?.statusCode === 404 || err?.statusCode === 410) {
