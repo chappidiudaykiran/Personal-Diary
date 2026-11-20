@@ -424,10 +424,26 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Day filter — pick any day, see what you wrote, or backfill it */}
+        {/* Day filter — pick any day, see what you wrote, or backfill it.
+            The visible label is ours (theme-aware); the native date input
+            sits invisibly on top so tapping opens the OS day picker. Native
+            date text is unreadable on phones in both themes, so we never
+            show it. */}
         {entries.length > 0 && (
           <div className="flex items-center gap-2 mt-3 flex-wrap fade-up" style={{ animationDelay: '0.07s' }}>
-            <div className="relative">
+            <div
+              className="relative rounded-xl px-3 py-2 text-xs font-medium cursor-pointer"
+              style={{
+                background: 'var(--bg-input)',
+                border: dayFilter ? '1px solid var(--border-bright)' : '1px solid var(--border-color)',
+                color: 'var(--text-primary)',
+              }}
+              title="Pick a day"
+            >
+              <span className="flex items-center gap-1.5">
+                <span aria-hidden="true">📅</span>
+                {dayFilter ? formatDateKey(dayFilter) : 'Pick a day'}
+              </span>
               <input
                 type="date"
                 value={dayFilter}
@@ -440,22 +456,17 @@ export default function Dashboard() {
                     setDayFilter(v);
                   }
                 }}
-                className="pl-3 pr-2 py-2 rounded-xl text-xs outline-none cursor-pointer"
-                style={{
-                  background: dayFilter ? 'var(--gold-glow)' : 'var(--bg-input)',
-                  border: dayFilter ? '1px solid var(--border-bright)' : '1px solid var(--border-color)',
-                  color: dayFilter ? 'var(--gold)' : 'var(--text-muted)',
-                  colorScheme: 'dark',
-                }}
-                title="Jump to a day"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                style={{ colorScheme: 'dark' }}
+                title="Pick a day"
               />
             </div>
             {dayFilter ? (
               <>
                 <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
                   {filtered.length === 0
-                    ? `Nothing written on ${formatDateKey(dayFilter)} yet`
-                    : `${filtered.length} ${filtered.length === 1 ? 'entry' : 'entries'} on ${formatDateKey(dayFilter)}`}
+                    ? 'Nothing written yet'
+                    : `${filtered.length} ${filtered.length === 1 ? 'entry' : 'entries'}`}
                 </span>
                 <Link
                   to={`/entry/new?date=${dayFilter}`}
@@ -475,8 +486,8 @@ export default function Dashboard() {
                 </button>
               </>
             ) : (
-              <span className="text-[11px]" style={{ color: 'var(--text-ghost)' }}>
-                Pick a day to revisit it — or write for a missed day
+              <span className="text-[11px] flex-1" style={{ color: 'var(--text-ghost)', minWidth: '140px' }}>
+                Revisit it — or write for a missed day
               </span>
             )}
           </div>

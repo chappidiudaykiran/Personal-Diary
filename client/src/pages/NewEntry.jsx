@@ -389,23 +389,31 @@ export default function NewEntry() {
                   Backdated entry
                 </span>
               )}
-              <input
-                type="date"
-                value={entryDate}
-                max={todayKey}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (isValidDateKey(v) && v <= todayKey) setEntryDate(v);
-                }}
-                className="ml-auto text-[11px] sm:text-xs rounded-lg px-2 py-1 outline-none cursor-pointer"
+              {/* Visible label is ours (theme-aware); the native date input
+                  sits invisibly on top so tapping opens the OS day picker. */}
+              <div
+                className="relative ml-auto rounded-lg px-2 py-1 text-[11px] sm:text-xs cursor-pointer"
                 style={{
                   background: 'var(--bg-elevated)',
                   border: '1px solid var(--border-color)',
-                  color: topMuted,
-                  colorScheme: 'dark',
+                  color: 'var(--text-primary)',
                 }}
                 title="Pick the day this entry belongs to"
-              />
+              >
+                <span>📅 Change day</span>
+                <input
+                  type="date"
+                  value={entryDate}
+                  max={todayKey}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (isValidDateKey(v) && v <= todayKey) setEntryDate(v);
+                  }}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  style={{ colorScheme: 'dark' }}
+                  title="Pick the day this entry belongs to"
+                />
+              </div>
             </div>
 
             {/* Title input */}
