@@ -86,12 +86,26 @@ export default function Account() {
   const [testing, setTesting] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
   const [phonePush, setPhonePush] = useState('unknown'); // on | off | unsupported | unknown
-  const [serverPhones, setServerPhones] = useState(null);
 
   useEffect(() => {
     setPerm(notificationState());
-    getPushSubscription().then((sub) => {
-      setPhonePush(sub ? 'on' : 'off');
+    // Auto-connect by default: if the reminder is ON but this phone was never
+    // registered (stale ON state), register it silently — no extra button.
+    getPushSubscription().then(async (sub) => {
+      if (sub) {
+        setPhonePush('on');
+        return;
+      }
+      setPhonePush('off');
+      const settings = getReminderSettings();
+      if (settings.enabled && notificationState() === 'granted') {
+        try {
+          await connectPhonePush(settings.time);
+          toast.success('This phone connected for reminders ✅');
+        } catch (_) {
+          // Stays off — toggling the switch off/on retries (user gesture)
+        }
+      }
     }).catch(() => setPhonePush('unknown'));
     // Refresh profile (createdAt) + entry count + server-registered phones
     (async () => {
@@ -103,12 +117,6 @@ export default function Account() {
         const { data } = await apiClient.get('/entries');
         setEntryCount((data.entries || []).length);
       } catch (_) {}
-      try {
-        const { data } = await apiClient.get('/push/status');
-        setServerPhones(data.count ?? 0);
-      } catch (_) {
-        setServerPhones(null);
-      }
     })();
   }, []);
 
@@ -121,7 +129,6 @@ export default function Account() {
       tzOffset: new Date().getTimezoneOffset(),
     });
     setPhonePush('on');
-    setServerPhones((n) => (n === null ? 1 : n + 1));
   };
 
   const persistReminder = (next) => {
@@ -364,28 +371,6 @@ export default function Account() {
                 style={{ background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', colorScheme: isDark ? 'dark' : 'light' }}
               />
             </div>
-            {reminder.enabled && phonePush !== 'on' && (
-              <button
-                type="button"
-                onClick={async () => {
-                  setPushBusy(true);
-                  try {
-                    await connectPhonePush(reminder.time);
-                    toast.success('This phone connected ✅ — reminders will arrive at the set time');
-                  } catch (err) {
-                    toast.error(err?.response?.data?.message || err?.message || 'Could not connect this phone');
-                  } finally {
-                    setPushBusy(false);
-                  }
-                }}
-                disabled={pushBusy}
-                className="mt-1 flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer disabled:opacity-50"
-                style={{ background: 'linear-gradient(135deg, #c4913a, #dba84a)', color: '#0c0c17' }}
-              >
-                {pushBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Bell className="w-3.5 h-3.5" />}
-                {pushBusy ? 'Connecting…' : 'Connect this phone for reminders'}
-              </button>
-            )}
             {phonePush === 'on' && (
               <button
                 type="button"
