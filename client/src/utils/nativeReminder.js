@@ -37,13 +37,24 @@ function username() {
   }
 }
 
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('timed out')), ms)),
+  ]);
+}
+
 /** Returns true only if OS notifications are actually allowed. */
 export async function ensureNativePermission() {
   const api = await ln();
   if (!api) return false;
   try {
-    const cur = await api.checkPermissions().catch(() => null);
+    const cur = await withTimeout(
+      api.checkPermissions().catch(() => null),
+      8000
+    );
     if (cur?.display === 'granted') return true;
+    // System dialog — no timeout, the user may take time to answer
     const req = await api.requestPermissions().catch(() => null);
     return req?.display === 'granted';
   } catch (_) {
@@ -71,30 +82,37 @@ export async function scheduleNativeDaily(time) {
   if (!allowed) return false;
   const name = username();
   try {
-    await api.cancel({ notifications: [{ id: 9001 }, { id: 9002 }] }).catch(() => {});
+    await withTimeout(
+      api.cancel({ notifications: [{ id: 9001 }, { id: 9002 }] }).catch(() => {}),
+      8000
+    );
     const [hh, mm] = (time || '21:00').split(':').map(Number);
-    await api.schedule({
-      notifications: [
-        {
-          id: 9001,
-          title: name ? `Hey ${name}, time to write` : 'My Diary',
-          body: name
-            ? `${name}, take a minute to write today's entry.`
-            : "Take a minute to write today's entry.",
-          schedule: {
-            // Repeat every day at the chosen time, even if the app is closed
-            on: { hour: Number(hh) || 0, minute: Number(mm) || 0 },
-            allowWhileIdle: true,
+    await withTimeout(
+      api.schedule({
+        notifications: [
+          {
+            id: 9001,
+            title: name ? `Hey ${name}, time to write` : 'My Diary',
+            body: name
+              ? `${name}, take a minute to write today's entry.`
+              : "Take a minute to write today's entry.",
+            schedule: {
+              // Repeat every day at the chosen time, even if the app is closed
+              on: { hour: Number(hh) || 0, minute: Number(mm) || 0 },
+              allowWhileIdle: true,
+            },
+            smallIcon: 'ic_launcher',
+            actionTypeId: 'OPEN_DIARY',
           },
-          smallIcon: 'ic_launcher',
-          actionTypeId: 'OPEN_DIARY',
-        },
-      ],
-    });
+        ],
+      }),
+      15000
+    );
     return true;
   } catch (e) {
     console.error('Native schedule failed:', e);
-    return false;
+    // Surface the real reason so a stuck toggle can be diagnosed
+    throw new Error(e?.message || 'schedule failed');
   }
 }
 

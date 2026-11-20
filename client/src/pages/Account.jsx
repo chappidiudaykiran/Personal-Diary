@@ -191,7 +191,12 @@ export default function Account() {
           toast.success(`Daily reminder set for ${formatTime12(reminder.time)} ✅`);
         } catch (err) {
           console.error('Native reminder failed:', err);
-          toast.error("Couldn't turn on reminders on this phone. Please try again.");
+          const reason = String(err?.message || '').slice(0, 90);
+          toast.error(
+            reason
+              ? `Couldn't turn on reminders (${reason}). Try again.`
+              : "Couldn't turn on reminders on this phone. Please try again."
+          );
         } finally {
           setPushBusy(false);
         }
