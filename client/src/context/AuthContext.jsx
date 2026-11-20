@@ -6,10 +6,29 @@ import { deriveKey, encryptWithPin, decryptWithPin } from '../crypto/cryptoUtils
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  // Read synchronously on first render so screens (splash greeting, lock
+  // screen name) have the user immediately instead of one frame later.
+  const [user, setUser] = useState(() => {
+    try {
+      const raw = localStorage.getItem('user');
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      return null;
+    }
+  });
   const [cryptoKey, setCryptoKey] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isLocked, setIsLocked] = useState(false);
+  const [isLocked, setIsLocked] = useState(() => {
+    try {
+      return Boolean(
+        localStorage.getItem('user') &&
+          localStorage.getItem('accessToken') &&
+          localStorage.getItem('diary_pin_vault')
+      );
+    } catch (_) {
+      return false;
+    }
+  });
   const [tempPassword, setTempPassword] = useState(null); // Used right after login to set a PIN seamlessly
   const [showPinSetup, setShowPinSetup] = useState(false);
 

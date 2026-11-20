@@ -5,10 +5,56 @@ import { useAuth } from '../context/AuthContext.jsx';
  * Branded launch screen (~2.7s): logo pops into the center with a gold glow,
  * greets you by name, then fades and the diary opens.
  */
+const TAGLINE_BODIES = [
+  'mood off aa? raasi padesey 😤',
+  'ee roju em jarigindo cheppu ☕',
+  'tension ekkuvaindi? aksharalu tho tagginchu 📝',
+  'navvu aapaku, diary lo daachu 😄',
+  'kopam vachinda? pen pattuko 😡',
+  'badha ga undha? oka page raayi 💬',
+  'happy ga unna? double ga raayi 🎉',
+  'bore koduthundha? kotha page open chey 😴',
+  'em aalochisthunnav? ventane raayi 💡',
+  'secret undha? ikkade cheppu 🤫',
+  'evariki cheppakunda anni raayi 🤐',
+  'roju ela gachindo oka line raayi ☀️',
+  'ninna night em kalo gurtundha? 🌙',
+  'repu plans enti? mundhe raayi 📋',
+  'chinna vishayam ayina pedda ga raayi 📖',
+  'gunde baram ga undha? digipettu 🫶',
+  'edupu vachindha? aksharalu aagavu 😢',
+  'navvuthu edusthu anni raayi 😂',
+  'kotha idea vachindha? miss avvaku 💡',
+  'exam ayipoyinda? full relax 😌',
+  'tiffin em thinnaro kuda raayi 🍵',
+  'amma thittindha? ikkade complaint chey 😅',
+  'best friend tho godava? raasi pettu 🤝',
+  'filter coffee aagindha? fresh ga raayi ☕',
+  'bus miss ayindha? parvaledu, raayi 🚌',
+  'rain vachindha? window pakkana raayi 🌧️',
+  'power cut ayindha? candle light lo raayi 🕯️',
+  'dabbul vishayam aina raayi, lekkalu marchipoku 💰',
+  'shopping chesava? story ga raayi 🛍️',
+  'movie chusava? review raayi 🎬',
+  'pata paata gurthochindha? venakki raaku 🎶',
+  'match odipoyara? next time gelustham 🏆',
+  'diet start chesava? first day story raayi 🥗',
+  'gym ki vellava? energy note chey 💪',
+  'kotta vishayam nerchukunnava? raasi pettu 🧠',
+  'surprise vachindha? shock ni save chey 🎁',
+  'long drive ki vellava? road story cheppu 🚗',
+  'pandaga vachindha? sandadi ni aapu 🎊',
+  'ee page ninnu miss avuthundhi ✍️',
+  'kastaalu anni kathalu ga maarali 🔄',
+];
+
 export default function AppSplash() {
   const { user } = useAuth();
   const [fading, setFading] = useState(false);
   const [visible, setVisible] = useState(true);
+  // Stable random pick per launch — the name is filled in at render time so
+  // it never gets stuck on the logged-out fallback.
+  const [lineIdx] = useState(() => Math.floor(Math.random() * TAGLINE_BODIES.length));
 
   useEffect(() => {
     // React is alive now — drop the instant HTML boot frame so only the
@@ -26,53 +72,7 @@ export default function AppSplash() {
 
   const name = user?.username || '';
   const title = name ? `Hey ${name}` : 'My Diary';
-  const [tagline] = useState(() => {
-    const lines = [
-      `${name}, mood off aa? raasi padesey 😤`,
-      `${name}, ee roju em jarigindo cheppu ☕`,
-      `${name}, tension ekkuvaindi? aksharalu tho tagginchu 📝`,
-      `${name}, navvu aapaku, diary lo daachu 😄`,
-      `${name}, kopam vachinda? pen pattuko 😡`,
-      `${name}, badha ga undha? oka page raayi 💬`,
-      `${name}, happy ga unna? double ga raayi 🎉`,
-      `${name}, bore koduthundha? kotha page open chey 😴`,
-      `${name}, em aalochisthunnav? ventane raayi 💡`,
-      `${name}, secret undha? ikkade cheppu 🤫`,
-      `${name}, evariki cheppakunda anni raayi 🤐`,
-      `${name}, roju ela gachindo oka line raayi ☀️`,
-      `${name}, ninna night em kalo gurtundha? 🌙`,
-      `${name}, repu plans enti? mundhe raayi 📋`,
-      `${name}, chinna vishayam ayina pedda ga raayi 📖`,
-      `${name}, gunde baram ga undha? digipettu 🫶`,
-      `${name}, edupu vachindha? aksharalu aagavu 😢`,
-      `${name}, navvuthu edusthu anni raayi 😂`,
-      `${name}, kotha idea vachindha? miss avvaku 💡`,
-      `${name}, exam ayipoyinda? full relax 😌`,
-      `${name}, tiffin em thinnaro kuda raayi 🍵`,
-      `${name}, amma thittindha? ikkade complaint chey 😅`,
-      `${name}, best friend tho godava? raasi pettu 🤝`,
-      `${name}, filter coffee aagindha? fresh ga raayi ☕`,
-      `${name}, bus miss ayindha? parvaledu, raayi 🚌`,
-      `${name}, rain vachindha? window pakkana raayi 🌧️`,
-      `${name}, power cut ayindha? candle light lo raayi 🕯️`,
-      `${name}, dabbul vishayam aina raayi, lekkalu marchipoku 💰`,
-      `${name}, shopping chesava? story ga raayi 🛍️`,
-      `${name}, movie chusava? review raayi 🎬`,
-      `${name}, pata paata gurthochindha? venakki raaku 🎶`,
-      `${name}, match odipoyara? next time gelustham 🏆`,
-      `${name}, diet start chesava? first day story raayi 🥗`,
-      `${name}, gym ki vellava? energy note chey 💪`,
-      `${name}, kotta vishayam nerchukunnava? raasi pettu 🧠`,
-      `${name}, surprise vachindha? shock ni save chey 🎁`,
-      `${name}, long drive ki vellava? road story cheppu 🚗`,
-      `${name}, pandaga vachindha? sandadi ni aapu 🎊`,
-      `${name}, ee page ninnu miss avuthundhi ✍️`,
-      `${name}, kastaalu anni kathalu ga maarali 🔄`,
-    ];
-    if (!name) return 'Your private space for everyday moments';
-    return lines[Math.floor(Math.random() * lines.length)];
-  });
-  const subtitle = tagline;
+  const subtitle = name ? `${name}, ${TAGLINE_BODIES[lineIdx]}` : 'Your private space for everyday moments';
 
   return (
     <div
