@@ -19,6 +19,9 @@ import {
   notificationState,
   requestNotificationPermission,
   fireReminderNotification,
+  subscribeDevicePush,
+  unsubscribeDevicePush,
+  getPushSubscription,
 } from '../utils/reminder.js';
 
 function Card({ icon: Icon, title, subtitle, children }) {
@@ -74,9 +77,14 @@ export default function Account() {
   const [reminder, setReminder] = useState(getReminderSettings);
   const [perm, setPerm] = useState('default');
   const [testing, setTesting] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [phonePush, setPhonePush] = useState('unknown'); // on | off | unsupported | unknown
 
   useEffect(() => {
     setPerm(notificationState());
+    getPushSubscription().then((sub) => {
+      setPhonePush(sub ? 'on' : 'off');
+    }).catch(() => setPhonePush('unknown'));
     // Refresh profile (createdAt) + entry count
     (async () => {
       try {
@@ -95,8 +103,9 @@ export default function Account() {
   };
 
   const handleToggleReminder = async () => {
+    if (pushBusy) return;
     if (!reminder.enabled) {
-      // Enabling — need permission first
+      // Enabling — need permission first, then register this phone with the server
       let p = notificationState();
       if (p === 'unsupported') {
         toast.error('Notifications are not supported in this browser');
@@ -110,11 +119,59 @@ export default function Account() {
           return;
         }
       }
+      setPushBusy(true);
+      try {
+        const sub = await subscribeDevicePush();
+        await apiClient.post('/push/subscribe', {
+          subscription: sub.toJSON(),
+          time: reminder.time,
+          tzOffset: new Date().getTimezoneOffset(),
+        });
+        setPhonePush('on');
+      } catch (err) {
+        setPhonePush('unsupported');
+        toast.error(err?.response?.data?.message || err?.message || 'Phone push failed — local reminder only');
+      } finally {
+        setPushBusy(false);
+      }
       persistReminder({ enabled: true });
       toast.success(`Daily reminder set for ${reminder.time} ✅`);
     } else {
+      setPushBusy(true);
+      try {
+        await apiClient.put('/push/state', { enabled: false });
+        setPhonePush('off');
+      } catch (_) {
+        // Local off still applies even if the server call fails
+      } finally {
+        setPushBusy(false);
+      }
       persistReminder({ enabled: false });
       toast.success('Daily reminder turned off');
+    }
+  };
+
+  const handleTimeChange = async (time) => {
+    const next = time || '21:00';
+    persistReminder({ time: next });
+    if (reminder.enabled) {
+      try {
+        await apiClient.put('/push/state', { time: next, tzOffset: new Date().getTimezoneOffset() });
+      } catch (_) {
+        toast.error('Time saved on this phone, but server sync failed');
+      }
+    }
+  };
+
+  const handleRemoveDevice = async () => {
+    try {
+      const sub = await getPushSubscription();
+      await apiClient.delete('/push/unsubscribe', { data: { endpoint: sub?.endpoint } });
+      await unsubscribeDevicePush();
+      setPhonePush('off');
+      toast.success('This phone removed from reminders');
+    } catch (_) {
+      toast.error('Failed to remove this phone');
     }
   };
 
@@ -243,12 +300,17 @@ export default function Account() {
           <Card icon={Bell} title="Daily reminder" subtitle="Nudges you to write — fires while the app is open or installed">
             <Row
               label="Remind me every day"
-              hint={reminder.enabled ? `Fires once a day after ${reminder.time}` : 'Off'}
+              hint={
+                reminder.enabled
+                  ? `Fires once a day after ${reminder.time} · phone push ${phonePush === 'on' ? 'connected ✅' : phonePush === 'off' ? 'not connected' : '…'}` 
+                  : 'Off'
+              }
               right={
                 <button
                   type="button"
                   onClick={handleToggleReminder}
-                  className="w-11 h-6 rounded-full relative transition-colors cursor-pointer flex-shrink-0"
+                  disabled={pushBusy}
+                  className="w-11 h-6 rounded-full relative transition-colors cursor-pointer disabled:opacity-50 flex-shrink-0"
                   style={{ background: reminder.enabled ? 'var(--gold)' : 'var(--border-color)' }}
                   aria-label={reminder.enabled ? 'Turn reminder off' : 'Turn reminder on'}
                 >
@@ -269,11 +331,21 @@ export default function Account() {
               <input
                 type="time"
                 value={reminder.time}
-                onChange={(e) => persistReminder({ time: e.target.value || '21:00' })}
+                onChange={(e) => handleTimeChange(e.target.value)}
                 className="px-3 py-2 rounded-xl text-sm outline-none"
                 style={{ background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', colorScheme: isDark ? 'dark' : 'light' }}
               />
             </div>
+            {phonePush === 'on' && (
+              <button
+                type="button"
+                onClick={handleRemoveDevice}
+                className="mt-1 flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-xl text-xs font-medium cursor-pointer"
+                style={{ background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-ghost)' }}
+              >
+                Remove this phone from reminders
+              </button>
+            )}
             <button
               type="button"
               onClick={handleTestReminder}

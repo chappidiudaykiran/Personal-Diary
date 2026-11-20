@@ -1,0 +1,28 @@
+name: push-tick
+
+# Delivers due daily-reminder pushes every 5 minutes.
+# Calls the backend tick worker, which compares each device's local reminder
+# time and sends web-push to those that are due.
+# Requires repo secret PUSH_TICK_SECRET = same value as the backend
+# PUSH_TICK_SECRET env var on Render.
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger push tick
+        run: |
+          for i in 1 2 3; do
+            if curl -fsS --max-time 90 "https://diary-backend-orc0.onrender.com/api/push/tick?secret=${{ secrets.PUSH_TICK_SECRET }}"; then
+              echo "Tick ok"
+              exit 0
+            fi
+            echo "Attempt $i failed, retrying in 20s..."
+            sleep 20
+          done
+          echo "Push tick failed after 3 attempts"
+          exit 1

@@ -1,9 +1,11 @@
 // ─── reminder.js ─────────────────────────────────────────────────────────────
-// Daily diary reminder using the Web Notification API (no push server needed).
+// Two layers:
+// 1. Server push (primary): device subscribes via PushManager; the backend
+//    tick worker (GitHub Actions cron -> /api/push/tick) delivers the daily
+//    reminder at the user's local time even when the app is closed.
+// 2. Local check (backup): while the app is open, checks every 30s and fires
+//    once/day via the service worker.
 // Settings persist in localStorage: { enabled, time: "HH:MM", lastFired: "YYYY-MM-DD" }.
-// The app checks every 30s while open; when the time passes it fires once/day.
-// Note: true background delivery while the app is fully closed needs a push
-// server — this covers the realistic case (PWA installed / tab open).
 
 const KEY = 'diary_reminder_v1';
 
@@ -75,6 +77,52 @@ function storedUsername() {
   } catch (_) {
     return '';
   }
+}
+
+// ─── Server push (works even when the app is closed) ─────────────────────────
+// The service worker receives the push and shows the notification
+// (see public/sw-notif-click.js "push" listener).
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = window.atob(base64);
+  const output = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) output[i] = raw.charCodeAt(i);
+  return output;
+}
+
+export async function getPushSubscription() {
+  try {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
+    const reg = await navigator.serviceWorker.ready;
+    return await reg.pushManager.getSubscription();
+  } catch (_) {
+    return null;
+  }
+}
+
+/** Subscribe this device for server-sent reminders. Returns the subscription or null. */
+export async function subscribeDevicePush() {
+  const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY || '';
+  if (!vapidKey) throw new Error('Push not configured (missing VAPID key)');
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    throw new Error('Push notifications are not supported on this device');
+  }
+  const reg = await navigator.serviceWorker.ready;
+  const existing = await reg.pushManager.getSubscription();
+  if (existing) return existing;
+  return reg.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(vapidKey),
+  });
+}
+
+export async function unsubscribeDevicePush() {
+  try {
+    const sub = await getPushSubscription();
+    if (sub) await sub.unsubscribe();
+  } catch (_) {}
 }
 
 export async function fireReminderNotification() {
