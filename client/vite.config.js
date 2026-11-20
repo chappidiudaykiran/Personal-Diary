@@ -36,15 +36,11 @@ export default defineConfig({
   ],
   build: {
     chunkSizeWarningLimit: 600,
-    rollupOptions: {
-      output: {
-        // Split heavy vendors so repeat visits use cached chunks
-        manualChunks(id) {
-          if (id.includes('node_modules/react-dom') || id.includes('node_modules/react-router') || id.includes('node_modules/react/')) return 'react';
-          if (id.includes('node_modules')) return 'vendor';
-        },
-      },
-    },
+    // NOTE: no custom manualChunks — a previous react/vendor split created a
+    // circular chunk dependency (react chunk called a helper from the
+    // apiClient chunk before it finished evaluating), which crashed the
+    // production bundle with "t is not a function" while dev worked fine.
+    // Vite's default chunking stays correct; lazy routes still code-split.
   },
   server: {
     port: 5173,
