@@ -26,8 +26,18 @@ export default function AppSplash() {
 
   const name = user?.username || '';
   const title = name ? `Hey ${name}` : 'My Diary';
+  const taglines = [
+    `${name}, today is a blank page — make it yours ✍️`,
+    `${name}, your story continues here ✍️`,
+    `${name}, small moments, safely kept ✍️`,
+    `${name}, write it before the day forgets ✍️`,
+    `${name}, this page missed you ✍️`,
+  ];
+  const dayOfYear = Math.floor(
+    (new Date() - new Date(new Date().getFullYear(), 0, 0)) / 86400000
+  );
   const subtitle = name
-    ? 'Welcome back to your private space ✍️'
+    ? taglines[dayOfYear % taglines.length]
     : 'Your private space for everyday moments';
 
   return (
