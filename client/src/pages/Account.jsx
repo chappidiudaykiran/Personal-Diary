@@ -23,6 +23,7 @@ import {
   unsubscribeDevicePush,
   getPushSubscription,
 } from '../utils/reminder.js';
+import { friendlyServerError } from '../utils/friendlyError.js';
 
 function formatTime12(hhmm) {
   const [h, m] = (hhmm || '21:00').split(':').map(Number);
@@ -157,7 +158,12 @@ export default function Account() {
         await connectPhonePush(reminder.time);
       } catch (err) {
         setPhonePush('unsupported');
-        toast.error(err?.response?.data?.message || err?.message || 'Phone push failed — local reminder only');
+        toast.error(
+          friendlyServerError(
+            err?.response?.data?.message || err?.message,
+            "Couldn't turn on reminders on this phone. Please try again."
+          )
+        );
       } finally {
         setPushBusy(false);
       }
@@ -191,7 +197,7 @@ export default function Account() {
           await apiClient.put('/push/state', { time: next, tzOffset: new Date().getTimezoneOffset() });
         }
       } catch (_) {
-        toast.error('Time saved on this phone, but server sync failed');
+        toast.error("Time saved here, but it didn't reach everywhere. Check your internet.");
       }
     }
   };
@@ -202,9 +208,9 @@ export default function Account() {
       await apiClient.delete('/push/unsubscribe', { data: { endpoint: sub?.endpoint } });
       await unsubscribeDevicePush();
       setPhonePush('off');
-      toast.success('This phone removed from reminders');
+      toast.success('Reminders removed from this phone');
     } catch (_) {
-      toast.error('Failed to remove this phone');
+      toast.error("Couldn't remove reminders from this phone");
     }
   };
 
@@ -240,7 +246,7 @@ export default function Account() {
       await updateProfile({ username: clean });
       toast.success('Profile updated ✨');
     } catch (err) {
-      toast.error(err?.response?.data?.message || 'Failed to update profile');
+      toast.error(friendlyServerError(err?.response?.data?.message, 'Could not update your name. Please try again.'));
     } finally {
       setSavingName(false);
     }
@@ -297,7 +303,7 @@ export default function Account() {
 
         <div className="space-y-4">
           {/* Profile */}
-          <Card icon={User} title="Profile" subtitle="Username is safe to change — encryption is untouched">
+          <Card icon={User} title="Profile" subtitle="Changing your name won't touch your entries">
             <label className="text-[11px] uppercase tracking-widest font-medium" style={{ color: 'var(--text-ghost)' }}>
               Username
             </label>
@@ -335,7 +341,7 @@ export default function Account() {
               label="Remind me every day"
               hint={
                 reminder.enabled
-                  ? `Fires once a day at ${formatTime12(reminder.time)} · phone push ${phonePush === 'on' ? 'connected ✅' : phonePush === 'off' ? 'not connected' : '…'}` 
+                  ? `Fires once a day at ${formatTime12(reminder.time)} · ${phonePush === 'on' ? 'connected ✅' : phonePush === 'off' ? 'not connected' : '…'}` 
                   : 'Off'
               }
               right={

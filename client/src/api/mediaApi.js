@@ -111,7 +111,7 @@ export async function getMediaMeta(mediaId) {
 /** Decrypt filename/MIME from metadata without downloading the file itself. */
 export async function decryptMediaMeta(cryptoKey, media) {
   const [name, mime] = await Promise.all([
-    decrypt(cryptoKey, media.encryptedName, media.nameIv).catch(() => 'Encrypted file'),
+    decrypt(cryptoKey, media.encryptedName, media.nameIv).catch(() => 'File'),
     decrypt(cryptoKey, media.encryptedMime, media.mimeIv).catch(() => 'application/octet-stream'),
   ]);
   return { ...media, name, mime, kind: kindFromMime(mime, name) };

@@ -12,6 +12,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { encrypt, decrypt } from '../crypto/cryptoUtils.js';
 import { useKeyboardOpen } from '../hooks/useKeyboardOpen.js';
 import { useWallpaper } from '../context/WallpaperContext.jsx';
+import { friendlyServerError } from '../utils/friendlyError.js';
 import {
   parseEntryContent,
   serializeBlocks,
@@ -153,7 +154,7 @@ export default function ViewEntry() {
   // ─── Save edited entry ─────────────────────────────────────────────────────
   const handleSave = async () => {
     if (!cryptoKey) {
-      toast.error('Session expired — please login again to unlock encryption.');
+      toast.error('You were signed out. Please sign in again to open your diary.');
       return;
     }
     if (!title.trim()) {
@@ -211,31 +212,33 @@ export default function ViewEntry() {
       setEditing(false);
 
       if (failedUploads > 0) {
-        toast.error(`Entry updated, but ${failedUploads} attachment${failedUploads === 1 ? '' : 's'} failed to upload`);
+        toast.error(`Entry updated, but ${failedUploads} file${failedUploads === 1 ? '' : 's'} failed to upload`);
       } else {
         toast.success('Entry updated ✨');
       }
     } catch (err) {
       const status = err?.response?.status;
-      const serverMsg =
-        err?.response?.data?.message || err?.response?.data?.errors?.[0]?.msg;
+      const serverMsg = friendlyServerError(
+        err?.response?.data?.message || err?.response?.data?.errors?.[0]?.msg,
+        ''
+      );
       console.error('Update entry failed:', {
         status,
         data: err?.response?.data,
         code: err?.code,
       });
       if (err?.code === 'ECONNABORTED') {
-        toast.error('Server is waking up (cold start). Wait ~30s and try again.');
+        toast.error('Starting up… please wait about 30 seconds and try again.');
       } else if (status === 401) {
-        toast.error('Session expired. Please login again.');
+        toast.error('You were signed out. Please sign in again.');
       } else if (status === 413) {
         toast.error('Entry too large. Remove some images or shorten text.');
       } else if (serverMsg) {
         toast.error(serverMsg);
       } else if (!err?.response) {
-        toast.error('Cannot reach server. Check connection / backend status.');
+        toast.error("Can't reach your diary. Check your internet and try again.");
       } else {
-        toast.error('Failed to update entry');
+        toast.error('Could not save changes');
       }
     } finally {
       setSaving(false);
@@ -251,7 +254,7 @@ export default function ViewEntry() {
       toast.success('Entry deleted');
       navigate('/dashboard');
     } catch {
-      toast.error('Failed to delete entry');
+      toast.error("Couldn't delete this entry");
       setDeleting(false);
     }
   };

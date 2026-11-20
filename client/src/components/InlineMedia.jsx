@@ -39,7 +39,7 @@ export function InlineMedia({ cryptoKey, mediaId, layout = 'aside', width = 38, 
           if (cancelled) return;
           setMedia(full);
         }
-      } catch { if (!cancelled) setError('Attachment unavailable'); }
+      } catch { if (!cancelled) setError('File unavailable'); }
     };
     if (cryptoKey && mediaId) load();
     return () => { cancelled = true; };
@@ -53,7 +53,7 @@ export function InlineMedia({ cryptoKey, mediaId, layout = 'aside', width = 38, 
       const full = media.url ? media : await fetchDecryptedMedia(cryptoKey, media);
       if (!media.url) setMedia(full);
       downloadObjectUrl(full.url, full.name);
-    } catch { setError('Could not decrypt this file'); } finally { setDownloading(false); }
+    } catch { setError("Couldn't open this file"); } finally { setDownloading(false); }
   };
 
   if (error) {

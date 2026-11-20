@@ -12,6 +12,7 @@ import { encrypt } from '../crypto/cryptoUtils.js';
 import { useAutoSave } from '../hooks/useAutoSave.js';
 import { useKeyboardOpen } from '../hooks/useKeyboardOpen.js';
 import { useWallpaper } from '../context/WallpaperContext.jsx';
+import { friendlyServerError } from '../utils/friendlyError.js';
 import { saveDraftBlobs, loadDraftBlobs, clearDraftBlobs } from '../utils/draftMediaStore.js';
 import {
   createTextBlock,
@@ -216,7 +217,7 @@ export default function NewEntry() {
   const handleSave = async (e) => {
     e.preventDefault();
     if (!cryptoKey) {
-      toast.error('Session expired — please login again to unlock encryption.');
+      toast.error('You were signed out. Please sign in again to open your diary.');
       return;
     }
     if (!title.trim()) {
@@ -263,7 +264,7 @@ export default function NewEntry() {
       }
 
       if (failedUploads > 0) {
-        toast.error(`Entry saved, but ${failedUploads} attachment${failedUploads === 1 ? '' : 's'} failed to upload`);
+        toast.error(`Entry saved, but ${failedUploads} file${failedUploads === 1 ? '' : 's'} failed to upload`);
       } else {
         toast.success('Entry saved ✨');
       }
@@ -272,8 +273,10 @@ export default function NewEntry() {
       navigate(`/entry/${entryId}`);
     } catch (err) {
       const status = err?.response?.status;
-      const serverMsg =
-        err?.response?.data?.message || err?.response?.data?.errors?.[0]?.msg;
+      const serverMsg = friendlyServerError(
+        err?.response?.data?.message || err?.response?.data?.errors?.[0]?.msg,
+        ''
+      );
       console.error('Save entry failed:', {
         status,
         data: err?.response?.data,
@@ -281,17 +284,17 @@ export default function NewEntry() {
         message: err?.message,
       });
       if (err?.code === 'ECONNABORTED') {
-        toast.error('Server is waking up (cold start). Wait ~30s and try again.');
+        toast.error('Starting up… please wait about 30 seconds and try again.');
       } else if (status === 401) {
-        toast.error('Session expired. Please login again.');
+        toast.error('You were signed out. Please sign in again.');
       } else if (status === 413) {
         toast.error('Entry too large. Remove some images or shorten text.');
       } else if (serverMsg) {
         toast.error(serverMsg);
       } else if (!err?.response) {
-        toast.error('Cannot reach server. Check connection / backend status.');
+        toast.error("Can't reach your diary. Check your internet and try again.");
       } else {
-        toast.error('Failed to save entry. Please try again.');
+        toast.error('Could not save entry. Please try again.');
       }
     } finally {
       setSaving(false);

@@ -96,7 +96,7 @@ export default function EntryCard({ entry, decryptedTitle, isDecrypting }) {
               {entry.wordCount || 0} {entry.wordCount === 1 ? 'word' : 'words'}
             </span>
             {entry.mediaCount > 0 && (
-              <span className="flex items-center gap-1" title={`${entry.mediaCount} attachment${entry.mediaCount === 1 ? '' : 's'}`}>
+              <span className="flex items-center gap-1" title={`${entry.mediaCount} file${entry.mediaCount === 1 ? '' : 's'}`}>
                 <Paperclip className="w-3 h-3" />
                 {entry.mediaCount}
               </span>

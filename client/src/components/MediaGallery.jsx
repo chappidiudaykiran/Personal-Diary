@@ -57,13 +57,13 @@ export default function MediaGallery({ entryId, cryptoKey, editable = false, ref
               setItems((prev) => prev.map((it) => (it._id === m._id ? { ...it, url: full.url } : it)));
             } catch {
               setItems((prev) =>
-                prev.map((it) => (it._id === m._id ? { ...it, error: 'Could not decrypt' } : it))
+                prev.map((it) => (it._id === m._id ? { ...it, error: "Couldn't open" } : it))
               );
             }
           })
       );
     } catch {
-      toast.error('Failed to load attachments');
+      toast.error("Couldn't load your files");
     } finally {
       setLoading(false);
     }
@@ -89,7 +89,7 @@ export default function MediaGallery({ entryId, cryptoKey, editable = false, ref
       const withUrl = await ensureUrl(item);
       downloadObjectUrl(withUrl.url, withUrl.name);
     } catch {
-      toast.error('Failed to decrypt file');
+      toast.error("Couldn't open this file");
     }
   };
 
@@ -105,9 +105,9 @@ export default function MediaGallery({ entryId, cryptoKey, editable = false, ref
         return next;
       });
       setLightbox(-1);
-      toast.success('Attachment deleted');
+      toast.success('File deleted');
     } catch {
-      toast.error('Failed to delete attachment');
+      toast.error("Couldn't delete this file");
     } finally {
       setDeletingId(null);
     }
@@ -123,7 +123,7 @@ export default function MediaGallery({ entryId, cryptoKey, editable = false, ref
       await ensureUrl(item);
       setLightbox(index);
     } catch {
-      toast.error('Failed to decrypt file');
+      toast.error("Couldn't open this file");
     }
   };
 
@@ -154,9 +154,9 @@ export default function MediaGallery({ entryId, cryptoKey, editable = false, ref
   return (
     <div>
       <p className="flex items-center gap-1.5 text-xs uppercase tracking-widest font-medium mb-3" style={{ color: 'var(--text-muted)' }}>
-        Attachments ({items.length})
+        Files ({items.length})
         <span className="flex items-center gap-1 normal-case tracking-normal" style={{ color: 'var(--text-ghost)' }}>
-          <Lock className="w-3 h-3" /> end-to-end encrypted
+          <Lock className="w-3 h-3" /> private to you
         </span>
       </p>
 
