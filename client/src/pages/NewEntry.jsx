@@ -246,7 +246,7 @@ export default function NewEntry() {
         for (let i = 0; i < pending.length; i++) {
           const block = pending[i];
           try {
-            setUploadStatus(`Encrypting & uploading ${i + 1} of ${pending.length}: ${block.file.name}`);
+            setUploadStatus(`Saving file ${i + 1} of ${pending.length}: ${block.file.name}`);
             const media = await uploadMediaFile(cryptoKey, entryId, block.file);
             finalBlocks = finalBlocks.map((b) =>
               b.key === block.key ? { ...b, mediaId: media._id, tempId: null, file: null } : b

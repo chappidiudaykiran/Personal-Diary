@@ -116,7 +116,7 @@ export default function MediaPicker({ files, onChange, existingCount = 0, disabl
           </span>
         </span>
         <span className="flex items-center gap-1 text-[11px]" style={{ color: 'var(--text-ghost)' }}>
-          <Lock className="w-3 h-3" /> Encrypted on this device before upload
+          <Lock className="w-3 h-3" /> Locked — only you can open these
         </span>
       </button>
 

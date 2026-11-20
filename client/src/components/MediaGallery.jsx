@@ -142,7 +142,7 @@ export default function MediaGallery({ entryId, cryptoKey, editable = false, ref
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-xs py-2" style={{ color: 'var(--text-ghost)' }}>
-        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading attachments…
+        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading your files…
       </div>
     );
   }

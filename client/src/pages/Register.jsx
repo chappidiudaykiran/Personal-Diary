@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, ArrowRight, Check, BookOpen, Sun, Moon } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext.jsx';
+import { friendlyServerError } from '../utils/friendlyError.js';
 import { useTheme } from '../context/ThemeContext.jsx';
 import { useWallpaper } from '../context/WallpaperContext.jsx';
 
@@ -59,12 +60,10 @@ export default function Register() {
       navigate('/dashboard');
     } catch (err) {
       console.error('Registration error:', err);
-      let msg = 'Registration failed. Please try again.';
-      if (err.response?.data?.message) {
-        msg = err.response.data.message;
-      } else if (err.response?.data?.errors?.[0]?.msg) {
-        msg = err.response.data.errors[0].msg;
-      }
+      const msg = friendlyServerError(
+        err.response?.data?.message || err.response?.data?.errors?.[0]?.msg,
+        'Could not create your account. Please try again.'
+      );
       setError(msg);
       toast.error(msg);
     } finally {
