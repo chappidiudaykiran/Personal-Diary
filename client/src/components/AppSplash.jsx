@@ -9,8 +9,8 @@ export default function AppSplash() {
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
-    const fadeTimer = setTimeout(() => setFading(true), 2500);
-    const hideTimer = setTimeout(() => setVisible(false), 3000);
+    const fadeTimer = setTimeout(() => setFading(true), 1700);
+    const hideTimer = setTimeout(() => setVisible(false), 2200);
     return () => {
       clearTimeout(fadeTimer);
       clearTimeout(hideTimer);
