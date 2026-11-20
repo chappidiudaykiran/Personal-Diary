@@ -101,7 +101,7 @@ export default function EntryCard({ entry, decryptedTitle, isDecrypting }) {
                 {entry.mediaCount}
               </span>
             )}
-            <span>{formatDate(dateObj)} · {formatTime(dateObj)}</span>
+            <span className="whitespace-nowrap">{formatDate(dateObj)} · {formatTime(dateObj)}</span>
           </div>
         </div>
       </article>
