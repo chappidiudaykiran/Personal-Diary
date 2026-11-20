@@ -36,10 +36,9 @@ export default function AppSplash() {
       }}
     >
       <style>{`
-        @keyframes splash-pop {
-          0% { transform: scale(0.4) translateY(30px); opacity: 0; }
-          60% { transform: scale(1.08) translateY(0); opacity: 1; }
-          100% { transform: scale(1) translateY(0); opacity: 1; }
+        @keyframes splash-settle {
+          0% { transform: scale(1.06); opacity: 0; }
+          100% { transform: scale(1); opacity: 1; }
         }
         @keyframes splash-glow {
           0%, 100% { box-shadow: 0 0 24px rgba(219,168,74,0.45), 0 12px 48px rgba(0,0,0,0.5); }
@@ -71,7 +70,7 @@ export default function AppSplash() {
             className="w-36 h-36 rounded-full relative"
             style={{
               border: '3px solid rgba(219,168,74,0.9)',
-              animation: 'splash-pop 0.9s cubic-bezier(0.22, 1, 0.36, 1) both, splash-glow 2s ease-in-out 0.9s infinite',
+              animation: 'splash-settle 0.45s ease-out both, splash-glow 2s ease-in-out 0.45s infinite',
             }}
           />
         </div>
