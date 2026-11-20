@@ -327,15 +327,26 @@ export default function Account() {
               hint={pinSet ? 'Set on this device' : 'Not set'}
               right={
                 pinSet ? (
-                  <button
-                    type="button"
-                    onClick={handleRemovePin}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium cursor-pointer"
-                    style={{ background: 'rgba(224,85,85,0.12)', border: '1px solid rgba(224,85,85,0.3)', color: '#e05555' }}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    Remove
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowPinModal(true)}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium cursor-pointer"
+                      style={{ background: 'var(--gold-glow)', border: '1px solid var(--border-bright)', color: 'var(--gold)' }}
+                    >
+                      <KeyRound className="w-3.5 h-3.5" />
+                      Change
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleRemovePin}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium cursor-pointer"
+                      style={{ background: 'rgba(224,85,85,0.12)', border: '1px solid rgba(224,85,85,0.3)', color: '#e05555' }}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Remove
+                    </button>
+                  </div>
                 ) : (
                   <button
                     type="button"
