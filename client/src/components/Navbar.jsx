@@ -40,7 +40,7 @@ export default function Navbar() {
           borderBottom: '1px solid var(--border-color)',
         }}
       >
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
+        <div className="max-w-5xl mx-auto px-3 sm:px-6 h-14 flex items-center justify-between gap-2">
           {/* Brand */}
           <Link
             to="/dashboard"
@@ -61,7 +61,7 @@ export default function Navbar() {
           </Link>
 
           {/* Right */}
-          <div className="flex items-center gap-1.5 sm:gap-2.5">
+          <div className="flex items-center gap-1 sm:gap-2.5">
             {/* Theme toggle */}
             <button
               onClick={toggleTheme}

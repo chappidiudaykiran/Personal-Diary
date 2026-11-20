@@ -539,7 +539,7 @@ export default function Account() {
               hint={pinSet ? 'On for this phone' : 'Off'}
               right={
                 pinSet ? (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-end flex-wrap gap-2">
                     <button
                       type="button"
                       onClick={() => setShowPinModal(true)}

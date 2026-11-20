@@ -87,8 +87,7 @@ export default function EntryCard({ entry, decryptedTitle, isDecrypting }) {
           </div>
 
           {/* Footer */}
-          <div
-            className="flex items-center gap-3 text-[11px] pt-3"
+          <div className="flex items-center gap-3 flex-wrap text-[11px] pt-3"
             style={{ borderTop: '1px solid var(--border-color)', color: 'var(--text-ghost)' }}
           >
             <span className="flex items-center gap-1">
