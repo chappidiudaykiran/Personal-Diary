@@ -6,7 +6,13 @@
     <link rel="apple-touch-icon" href="/icon-192.png" />
     <link rel="manifest" href="/manifest.json" />
     <link rel="preload" as="image" href="/icon-192.png" fetchpriority="high" />
-    <style>html,body{background:#000;margin:0}</style>
+    <style>html,body{background:#000;margin:0}
+      /* Instant boot frame: paints with the very first pixels (before JS
+         boots), so the phone's launch screen hands off to an identical
+         black + logo frame instead of a second, separate splash. */
+      #boot-splash{position:fixed;inset:0;z-index:99;background:#000;display:flex;align-items:center;justify-content:center}
+      #boot-splash img{width:144px;height:144px;border-radius:9999px;border:3px solid rgba(219,168,74,.9);box-shadow:0 0 54px rgba(219,168,74,.8),0 12px 48px rgba(0,0,0,.5)}
+    </style>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="theme-color" content="#000000" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -27,6 +33,7 @@
     <title>Personal Diary</title>
   </head>
   <body>
+    <div id="boot-splash"><img src="/icon-192.png" alt="My Diary" fetchpriority="high" /></div>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

@@ -11,6 +11,9 @@ export default function AppSplash() {
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
+    // React is alive now — drop the instant HTML boot frame so only the
+    // animated splash remains (identical black + logo frame, no jump).
+    document.getElementById('boot-splash')?.remove();
     const fadeTimer = setTimeout(() => setFading(true), 2200);
     const hideTimer = setTimeout(() => setVisible(false), 2700);
     return () => {
