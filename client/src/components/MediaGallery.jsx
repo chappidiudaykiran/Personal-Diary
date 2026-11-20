@@ -34,7 +34,7 @@ export default function MediaGallery({ entryId, cryptoKey, editable = false, ref
   const [lightbox, setLightbox] = useState(-1);
   const [deletingId, setDeletingId] = useState(null);
   // NOTE: blob URLs are owned by the shared mediaApi blobCache. Never revoke
-  // them here — revoking a shared URL breaks the entry viewer too.
+  // them here Ã¢â‚¬â€ revoking a shared URL breaks the entry viewer too.
 
   const load = useCallback(async () => {    if (!entryId || !cryptoKey) {
       setLoading(false);
@@ -57,13 +57,13 @@ export default function MediaGallery({ entryId, cryptoKey, editable = false, ref
               setItems((prev) => prev.map((it) => (it._id === m._id ? { ...it, url: full.url } : it)));
             } catch {
               setItems((prev) =>
-                prev.map((it) => (it._id === m._id ? { ...it, error: "Couldn't open" } : it))
+                prev.map((it) => (it._id === m._id ? { ...it, error: "Couldn't show this" } : it))
               );
             }
           })
       );
     } catch {
-      toast.error("Couldn't load your files");
+      toast.error("Couldn't show your photos");
     } finally {
       setLoading(false);
     }
@@ -89,7 +89,7 @@ export default function MediaGallery({ entryId, cryptoKey, editable = false, ref
       const withUrl = await ensureUrl(item);
       downloadObjectUrl(withUrl.url, withUrl.name);
     } catch {
-      toast.error("Couldn't open this file");
+      toast.error("Couldn't open this photo or attachment");
     }
   };
 
@@ -105,9 +105,9 @@ export default function MediaGallery({ entryId, cryptoKey, editable = false, ref
         return next;
       });
       setLightbox(-1);
-      toast.success('File deleted');
+      toast.success('Removed');
     } catch {
-      toast.error("Couldn't delete this file");
+      toast.error("Couldn't remove this item");
     } finally {
       setDeletingId(null);
     }
@@ -123,7 +123,7 @@ export default function MediaGallery({ entryId, cryptoKey, editable = false, ref
       await ensureUrl(item);
       setLightbox(index);
     } catch {
-      toast.error("Couldn't open this file");
+      toast.error("Couldn't open this photo or attachment");
     }
   };
 
@@ -142,7 +142,7 @@ export default function MediaGallery({ entryId, cryptoKey, editable = false, ref
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-xs py-2" style={{ color: 'var(--text-ghost)' }}>
-        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading your files…
+        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Getting your photos readyÃ¢â‚¬Â¦
       </div>
     );
   }
@@ -154,9 +154,9 @@ export default function MediaGallery({ entryId, cryptoKey, editable = false, ref
   return (
     <div>
       <p className="flex items-center gap-1.5 text-xs uppercase tracking-widest font-medium mb-3" style={{ color: 'var(--text-muted)' }}>
-        Files ({items.length})
+        Photos & attachments ({items.length})
         <span className="flex items-center gap-1 normal-case tracking-normal" style={{ color: 'var(--text-ghost)' }}>
-          <Lock className="w-3 h-3" /> private to you
+          <Lock className="w-3 h-3" /> Only you can see these
         </span>
       </p>
 
@@ -213,7 +213,7 @@ export default function MediaGallery({ entryId, cryptoKey, editable = false, ref
               className="absolute bottom-0 inset-x-0 text-[10px] px-1.5 py-0.5 truncate pointer-events-none"
               style={{ background: 'rgba(0,0,0,0.55)', color: '#fff' }}
             >
-              {item.name} · {formatFileSize(Math.max(0, item.size - 16))}
+              {item.name} Ã‚Â· {formatFileSize(Math.max(0, item.size - 16))}
             </span>
 
             {editable && (
@@ -311,7 +311,7 @@ export default function MediaGallery({ entryId, cryptoKey, editable = false, ref
             {(current.kind === 'pdf' || current.kind === 'file') && (
               <div className="flex flex-col items-center gap-4 py-10">
                 <FileText className="w-16 h-16" style={{ color: 'var(--gold)' }} />
-                <span className="text-white/70 text-sm">Use Download below to save &amp; open this file.</span>
+                <span className="text-white/70 text-sm">Use the Save button below to keep and open this attachment.</span>
               </div>
             )}
             {!current.url && current.kind !== 'pdf' && current.kind !== 'file' && (
@@ -330,7 +330,7 @@ export default function MediaGallery({ entryId, cryptoKey, editable = false, ref
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer"
                 style={{ background: 'rgba(255,255,255,0.12)', color: '#fff' }}
               >
-                <Download className="w-3.5 h-3.5" /> Download
+                <Download className="w-3.5 h-3.5" /> Save to phone
               </button>
               {editable && (
                 <button

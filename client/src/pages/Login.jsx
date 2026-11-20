@@ -21,7 +21,7 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!email.trim() || !password.trim()) {
-      setError('Please fill in all fields.');
+      setError('Please enter your email and password.');
       return;
     }
     setError('');

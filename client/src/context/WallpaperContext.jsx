@@ -200,11 +200,11 @@ export function WallpaperProvider({ children }) {
 
   const uploadCustom = useCallback(async (file) => {
     if (!file || !file.type?.startsWith('image/')) {
-      toast.error('Please choose an image file');
+      toast.error('Please choose a photo');
       return false;
     }
     if (file.size > MAX_CUSTOM_BYTES) {
-      toast.error('Image is too large (max 10 MB)');
+      toast.error('That photo is too big — please choose one under 10 MB');
       return false;
     }
     try {
@@ -216,10 +216,10 @@ export function WallpaperProvider({ children }) {
       });
       setStored({ id: 'custom', customTone: tone });
       persist('custom', tone);
-      toast.success('Wallpaper set ✨');
+      toast.success('Background updated ✨');
       return true;
     } catch (_) {
-      toast.error('Could not save wallpaper on this device');
+      toast.error("Couldn't save your background. Try again.");
       return false;
     }
   }, []);

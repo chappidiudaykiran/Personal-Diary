@@ -18,7 +18,7 @@ function RouteLoader() {
   return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-app)' }}>
       <div className="text-sm font-display animate-pulse" style={{ color: 'var(--gold)' }}>
-        Loading…
+        Opening your diary…
       </div>
     </div>
   );
@@ -32,7 +32,7 @@ const PrivateRoute = ({ children }) => {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-app)' }}>
         <div className="text-lg font-display animate-pulse" style={{ color: 'var(--gold)' }}>
-          Loading diary…
+          Opening your diary…
         </div>
       </div>
     );

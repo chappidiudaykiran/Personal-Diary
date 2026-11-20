@@ -28,7 +28,7 @@ export default function WallpaperPicker({ isOpen, onClose }) {
       >
         <div className="flex items-center justify-between mb-1">
           <h2 className="font-display text-lg" style={{ color: 'var(--text-primary)' }}>
-            Wallpaper
+            Background
           </h2>
           <button
             type="button"
@@ -41,7 +41,7 @@ export default function WallpaperPicker({ isOpen, onClose }) {
           </button>
         </div>
         <p className="text-xs mb-4" style={{ color: 'var(--text-ghost)' }}>
-          Sits behind your diary. Cards stay readable on top. Photos up to 10 MB.
+          Shows behind your diary. Your writing stays easy to read. Photos up to 10 MB.
         </p>
 
         <div className="grid grid-cols-3 gap-2.5">
@@ -103,7 +103,7 @@ export default function WallpaperPicker({ isOpen, onClose }) {
               className="text-[11px] text-center truncate"
               style={{ color: wallpaper === 'custom' ? 'var(--gold)' : 'var(--text-muted)', fontWeight: wallpaper === 'custom' ? 600 : 400 }}
             >
-              {customUrl ? 'My photo' : 'Upload photo'}
+              {customUrl ? 'My photo' : 'Add photo'}
             </span>
           </button>
         </div>
@@ -116,7 +116,7 @@ export default function WallpaperPicker({ isOpen, onClose }) {
             style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-muted)' }}
           >
             <ImagePlus className="w-3.5 h-3.5" />
-            {customUrl ? 'Change photo' : 'Upload photo'}
+            {customUrl ? 'Change photo' : 'Add photo'}
           </button>
           {customUrl && (
             <button

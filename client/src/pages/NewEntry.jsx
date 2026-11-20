@@ -75,7 +75,7 @@ export default function NewEntry() {
     }
   });
 
-  // Autosave draft: text/title/mood -> localStorage, pending image blobs -> IndexedDB.
+  // Automatic saving draft: text/title/mood -> localStorage, pending image blobs -> IndexedDB.
   const draftContent = useMemo(() => blocksToDraftString(blocks), [blocks]);
 
   const {
@@ -102,7 +102,7 @@ export default function NewEntry() {
       pending = [];
     }
     if (pending.length === 0) {
-      toast.success('Draft restored');
+      toast.success('Your unsaved entry is back');
       setMediaResolved(true);
       return;
     }
@@ -134,16 +134,16 @@ export default function NewEntry() {
           )
         );
         if (found === pending.length) {
-          toast.success(`Draft restored with ${found} image${found === 1 ? '' : 's'} ✨`);
+          toast.success(`Welcome back — your unsaved entry is back with ${found} photo${found === 1 ? '' : 's'} ✨`);
         } else if (found > 0) {
-          toast(`Draft restored — ${pending.length - found} image${pending.length - found === 1 ? '' : 's'} need re-adding`, { icon: '🖼️' });
+          toast(`Your unsaved entry is back — ${pending.length - found} image${pending.length - found === 1 ? '' : 's'} need to be added again`, { icon: '🖼️' });
         } else {
-          toast(`Draft restored — ${pending.length} image${pending.length === 1 ? '' : 's'} need re-adding`, { icon: '🖼️' });
+          toast(`Your unsaved entry is back — ${pending.length} image${pending.length === 1 ? '' : 's'} need to be added again`, { icon: '🖼️' });
         }
       } catch (_) {
         if (!cancelled) {
           setBlocks((prev) => normalizeBlocks(prev.filter((b) => !(b.type === 'media' && b.pendingId))));
-          toast(`Draft restored — images need re-adding`, { icon: '🖼️' });
+          toast(`Your unsaved entry is back — images need to be added again`, { icon: '🖼️' });
         }
       } finally {
         if (!cancelled) setMediaResolved(true);
@@ -234,7 +234,7 @@ export default function NewEntry() {
       // 1. Create the entry (media blocks carry temporary ids for now)
       const { data } = await apiClient.post('/entries', await encryptEntry(blocks));
       const entryId = data.entry?._id;
-      if (!entryId) throw new Error('Entry was not created');
+      if (!entryId) throw new Error('Could not create your entry');
 
       // 2. Encrypt + upload each inserted file, then point the blocks at the real ids
       const pending = blocks.filter((b) => b.type === 'media' && b.file);
@@ -246,7 +246,7 @@ export default function NewEntry() {
         for (let i = 0; i < pending.length; i++) {
           const block = pending[i];
           try {
-            setUploadStatus(`Saving file ${i + 1} of ${pending.length}: ${block.file.name}`);
+            setUploadStatus(`Saving photo ${i + 1} of ${pending.length}: ${block.file.name}`);
             const media = await uploadMediaFile(cryptoKey, entryId, block.file);
             finalBlocks = finalBlocks.map((b) =>
               b.key === block.key ? { ...b, mediaId: media._id, tempId: null, file: null } : b
@@ -264,7 +264,7 @@ export default function NewEntry() {
       }
 
       if (failedUploads > 0) {
-        toast.error(`Entry saved, but ${failedUploads} file${failedUploads === 1 ? '' : 's'} failed to upload`);
+        toast.error(`Entry saved, but ${failedUploads} photo${failedUploads === 1 ? '' : 's'} could not be saved`);
       } else {
         toast.success('Entry saved ✨');
       }
@@ -284,11 +284,11 @@ export default function NewEntry() {
         message: err?.message,
       });
       if (err?.code === 'ECONNABORTED') {
-        toast.error('Starting up… please wait about 30 seconds and try again.');
+        toast.error('Waking up your diary… please wait about 30 seconds and try again.');
       } else if (status === 401) {
         toast.error('You were signed out. Please sign in again.');
       } else if (status === 413) {
-        toast.error('Entry too large. Remove some images or shorten text.');
+        toast.error('This entry is too big. Try removing some photos or shortening text.');
       } else if (serverMsg) {
         toast.error(serverMsg);
       } else if (!err?.response) {
@@ -414,7 +414,7 @@ export default function NewEntry() {
                     border: '1px solid var(--border-color)',
                     color: autoSaveEnabled ? 'var(--gold)' : 'var(--text-ghost)',
                   }}
-                  title={autoSaveEnabled ? 'Turn autosave off' : 'Turn autosave on'}
+                  title={autoSaveEnabled ? 'Turn automatic saving off' : 'Turn automatic saving on'}
                 >
                   <span
                     className="w-6 h-3.5 rounded-full relative transition-colors flex-shrink-0"
@@ -425,10 +425,10 @@ export default function NewEntry() {
                       style={{ left: autoSaveEnabled ? '12px' : '2px' }}
                     />
                   </span>
-                  Autosave {autoSaveEnabled ? 'on' : 'off'}
+                  Automatic saving {autoSaveEnabled ? 'on' : 'off'}
                 </button>
                 <span className="text-[11px]" style={{ color: 'var(--text-ghost)' }}>
-                  {autoSaveStatus === 'saving' ? 'Saving draft…' : autoSaveStatus === 'saved' && lastSavedAt ? `Draft saved ${lastSavedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : autoSaveStatus === 'restored' || hasRestoredDraft ? 'Draft restored' : autoSaveStatus === 'disabled' ? 'Autosave off' : ''}
+                  {autoSaveStatus === 'saving' ? 'Saving…' : autoSaveStatus === 'saved' && lastSavedAt ? `Saved ${lastSavedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : autoSaveStatus === 'restored' || hasRestoredDraft ? 'Your unsaved entry is back' : autoSaveStatus === 'disabled' ? 'Automatic saving off' : ''}
                   {hasRestoredDraft && (
                     <button type="button" onClick={handleDiscardDraft} className="ml-2 underline cursor-pointer" style={{ color: 'var(--gold)' }}>
                       Discard
@@ -440,7 +440,7 @@ export default function NewEntry() {
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 text-[11px] flex-shrink-0" style={{ color: 'var(--text-ghost)' }}>
                   <span>{wordCount} {wordCount === 1 ? 'word' : 'words'}</span>
-                  <span>{charCount} chars</span>
+                  <span>{charCount} characters</span>
                 </div>
                 <button
                   type="submit"

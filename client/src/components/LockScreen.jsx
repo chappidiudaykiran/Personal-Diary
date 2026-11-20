@@ -117,13 +117,13 @@ export default function LockScreen() {
         </div>
 
         <h2 className="font-display text-2xl mb-1" style={{ color: topInk, fontWeight: 400 }}>
-          {user?.username || 'Welcome Back'}
+          {user?.username || 'Welcome back'}
         </h2>
         <p className="text-xs mb-8" style={{ color: topMuted }}>
           {error ? (
-            <span className="text-red-500 font-medium">Incorrect PIN. Try again</span>
+            <span className="text-red-500 font-medium">Wrong PIN. Please try again.</span>
           ) : (
-            'Enter 4-digit PIN to unlock'
+            'Enter your 4-digit PIN to open your diary'
           )}
         </p>
 
@@ -202,7 +202,7 @@ export default function LockScreen() {
             className="text-xs font-medium transition-colors cursor-pointer hover:underline"
             style={{ color: 'var(--gold)' }}
           >
-            Sign in with email & password instead
+            Sign in with email and password instead
           </button>
         </div>
       </div>

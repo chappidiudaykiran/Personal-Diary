@@ -48,7 +48,7 @@ export default function SetPinModal({ isOpen, onClose }) {
 
   const submitPin = async (p1, p2) => {
     if (p1 !== p2) {
-      toast.error('PINs do not match. Try again.');
+      toast.error("Those numbers didn't match. Try again.");
       setPinState('');
       setConfirmPinState('');
       setStep(1);
@@ -58,10 +58,10 @@ export default function SetPinModal({ isOpen, onClose }) {
     setLoading(true);
     try {
       await setPin(p1, tempPassword || passwordInput);
-      toast.success('PIN Lock configured! 🔒');
+      toast.success('PIN set! Your diary is locked with your PIN 🔒');
       onClose();
     } catch {
-      toast.error('Failed to set PIN. Please check your password.');
+      toast.error("Couldn't set your PIN. Please check your password and try again.");
     } finally {
       setLoading(false);
     }
@@ -95,12 +95,12 @@ export default function SetPinModal({ isOpen, onClose }) {
           </div>
 
           <h3 className="font-display text-xl mb-1" style={{ color: 'var(--text-primary)' }}>
-            {step === 1 ? 'Set a 4-Digit PIN' : 'Confirm Your PIN'}
+            {step === 1 ? 'Choose a 4-number PIN' : 'Confirm your PIN'}
           </h3>
           <p className="text-xs mb-6" style={{ color: 'var(--text-muted)' }}>
             {step === 1
               ? 'Use this PIN to quickly unlock your diary'
-              : 'Re-enter your 4 digits to confirm'}
+              : 'Enter those 4 numbers again to confirm'}
           </p>
 
           {!tempPassword && step === 1 && (
@@ -182,7 +182,7 @@ export default function SetPinModal({ isOpen, onClose }) {
                 color: 'var(--text-muted)',
               }}
             >
-              DEL
+              Delete
             </button>
           </div>
 

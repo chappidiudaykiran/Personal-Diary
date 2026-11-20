@@ -105,9 +105,9 @@ export async function getPushSubscription() {
 /** Subscribe this device for server-sent reminders. Returns the subscription or null. */
 export async function subscribeDevicePush() {
   const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY || '';
-  if (!vapidKey) throw new Error('Push not configured (missing VAPID key)');
+  if (!vapidKey) throw new Error('Reminders are not set up yet. Please try again later.');
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    throw new Error('Push notifications are not supported on this device');
+    throw new Error('Reminders are not supported on this phone or browser');
   }
   const reg = await navigator.serviceWorker.ready;
   const existing = await reg.pushManager.getSubscription();

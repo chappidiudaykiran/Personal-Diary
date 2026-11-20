@@ -36,7 +36,7 @@ export default function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.username.trim() || !form.email.trim() || !form.password) {
-      setError('Please fill in all fields.');
+      setError('Please enter your name, email and password.');
       return;
     }
     if (form.password.length < 8) {

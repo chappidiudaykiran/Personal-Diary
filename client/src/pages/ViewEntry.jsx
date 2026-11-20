@@ -116,7 +116,7 @@ export default function ViewEntry() {
         if (!cancelled) setMediaReady(true);
       } catch (err) {
         if (cancelled) return;
-        toast.error('Failed to load entry');
+        toast.error('Could not open this entry. Please try again.');
         navigate('/dashboard');
       } finally {
         if (!cancelled) setLoading(false);
@@ -158,11 +158,11 @@ export default function ViewEntry() {
       return;
     }
     if (!title.trim()) {
-      toast.error('Title cannot be empty');
+      toast.error('Please add a title for your entry');
       return;
     }
     if (!hasBlockContent(blocks)) {
-      toast.error('Entry cannot be empty — add some text or media');
+      toast.error('Your entry is empty — add some writing or photos');
       return;
     }
     setSaving(true);
@@ -175,7 +175,7 @@ export default function ViewEntry() {
       for (let i = 0; i < pending.length; i++) {
         const block = pending[i];
         try {
-          setUploadStatus(`Saving file ${i + 1} of ${pending.length}: ${block.file.name}`);
+          setUploadStatus(`Saving photo ${i + 1} of ${pending.length}: ${block.file.name}`);
           const media = await uploadMediaFile(cryptoKey, id, block.file);
           finalBlocks = finalBlocks.map((b) =>
             b.key === block.key ? { ...b, mediaId: media._id, tempId: null, file: null } : b
@@ -212,7 +212,7 @@ export default function ViewEntry() {
       setEditing(false);
 
       if (failedUploads > 0) {
-        toast.error(`Entry updated, but ${failedUploads} file${failedUploads === 1 ? '' : 's'} failed to upload`);
+        toast.error(`Entry updated, but ${failedUploads} photo${failedUploads === 1 ? '' : 's'} could not be saved`);
       } else {
         toast.success('Entry updated ✨');
       }
@@ -228,11 +228,11 @@ export default function ViewEntry() {
         code: err?.code,
       });
       if (err?.code === 'ECONNABORTED') {
-        toast.error('Starting up… please wait about 30 seconds and try again.');
+        toast.error('Waking up your diary… please wait about 30 seconds and try again.');
       } else if (status === 401) {
         toast.error('You were signed out. Please sign in again.');
       } else if (status === 413) {
-        toast.error('Entry too large. Remove some images or shorten text.');
+        toast.error('This entry is too big. Try removing some photos or shortening text.');
       } else if (serverMsg) {
         toast.error(serverMsg);
       } else if (!err?.response) {
@@ -251,7 +251,7 @@ export default function ViewEntry() {
     setDeleting(true);
     try {
       await apiClient.delete(`/entries/${id}`);
-      toast.success('Entry deleted');
+      toast.success('Your entry was deleted');
       navigate('/dashboard');
     } catch {
       toast.error("Couldn't delete this entry");

@@ -126,9 +126,9 @@ export default function Dashboard() {
           let hasCache = false;
           try { hasCache = (JSON.parse(localStorage.getItem(listKey) || 'null') || []).length > 0; } catch (_) {}
           if (!navigator.onLine || hasCache) {
-            if (!navigator.onLine) toast('You are offline — showing saved entries', { icon: '📴' });
+            if (!navigator.onLine) toast("You're not connected to the internet — showing your saved entries", { icon: '📴' });
           } else {
-            toast.error('Failed to load entries');
+            toast.error("Couldn't show your entries. Check your connection and try again.");
           }
         }
       } finally {
@@ -186,7 +186,7 @@ export default function Dashboard() {
               </h1>
               <p className="mt-2 text-sm" style={{ color: topMuted }}>
                 {loading
-                  ? 'Loading your diary entries…'
+                  ? 'Getting your diary ready…'
                   : entries.length === 0
                   ? 'Your diary is empty. Start writing.'
                   : `${entries.length} ${entries.length === 1 ? 'entry' : 'entries'}`}

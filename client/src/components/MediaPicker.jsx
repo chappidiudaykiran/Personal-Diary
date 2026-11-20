@@ -55,11 +55,11 @@ export default function MediaPicker({ files, onChange, existingCount = 0, disabl
     const accepted = [];
     for (const file of incoming) {
       if (!isSupportedFile(file)) {
-        toast.error(`"${file.name}" is not a supported file type`);
+        toast.error(`"${file.name}" can't be added — please choose a photo, video, voice note or file`);
         continue;
       }
       if (file.size > MAX_FILE_BYTES) {
-        toast.error(`"${file.name}" is too large (max ${formatFileSize(MAX_FILE_BYTES)})`);
+        toast.error(`"${file.name}" is too big — biggest size is ${formatFileSize(MAX_FILE_BYTES)}`);
         continue;
       }
       if (files.some((f) => f.name === file.name && f.size === file.size && f.lastModified === file.lastModified)) {
@@ -70,11 +70,11 @@ export default function MediaPicker({ files, onChange, existingCount = 0, disabl
 
     const room = MAX_FILES_PER_ENTRY - existingCount - files.length;
     if (room <= 0) {
-      toast.error(`Maximum ${MAX_FILES_PER_ENTRY} files per entry`);
+      toast.error(`You can add up to ${MAX_FILES_PER_ENTRY} photos to one entry`);
       return;
     }
     if (accepted.length > room) {
-      toast.error(`Only ${room} more file${room === 1 ? '' : 's'} can be added`);
+      toast.error(`You can add ${room} more`);
     }
     if (accepted.length > 0) {
       onChange([...files, ...accepted.slice(0, room)]);
@@ -110,13 +110,13 @@ export default function MediaPicker({ files, onChange, existingCount = 0, disabl
       >
         <ImagePlus className="w-6 h-6" style={{ color: 'var(--gold)' }} />
         <span>
-          Add photos, videos, audio or documents
+          Add photos, videos or voice notes
           <span className="block text-xs mt-1" style={{ color: 'var(--text-ghost)' }}>
-            Click or drop files here · max {formatFileSize(MAX_FILE_BYTES)} each · up to {MAX_FILES_PER_ENTRY} files
+            Tap here or drag them in · up to {formatFileSize(MAX_FILE_BYTES)} each · up to {MAX_FILES_PER_ENTRY} items
           </span>
         </span>
         <span className="flex items-center gap-1 text-[11px]" style={{ color: 'var(--text-ghost)' }}>
-          <Lock className="w-3 h-3" /> Locked — only you can open these
+          <Lock className="w-3 h-3" /> Private — only you can see these
         </span>
       </button>
 

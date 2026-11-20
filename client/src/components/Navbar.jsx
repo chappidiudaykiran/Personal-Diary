@@ -18,7 +18,7 @@ export default function Navbar() {
 
   const handleLogout = async () => {
     await logout();
-    toast.success('Goodbye!');
+    toast.success('Signed out. See you soon!');
     navigate('/login');
   };
 
@@ -67,7 +67,7 @@ export default function Navbar() {
               onClick={toggleTheme}
               className="nav-icon-btn p-2 rounded-lg transition-all duration-150 cursor-pointer"
               style={{ color: topInk }}
-              title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+              title={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
             >
               {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" style={{ color: '#8a5a12' }} />}
             </button>
@@ -77,7 +77,7 @@ export default function Navbar() {
               onClick={() => setShowWallpaper(true)}
               className="nav-icon-btn p-2 rounded-lg transition-all duration-150 cursor-pointer"
               style={{ color: topInk }}
-              title="Change wallpaper"
+              title="Change background"
             >
               <Image className="w-4 h-4" style={{ color: 'currentColor' }} />
             </button>
@@ -87,7 +87,7 @@ export default function Navbar() {
               onClick={handleLock}
               className="nav-icon-btn p-2 rounded-lg transition-all duration-150 cursor-pointer"
               style={{ color: topInk }}
-              title={hasPin ? 'Lock Diary' : 'Set PIN Lock'}
+              title={hasPin ? 'Lock diary now' : 'Set PIN'}
             >
               {hasPin ? <Lock className="w-4 h-4 text-amber-500" /> : <KeyRound className="w-4 h-4" />}
             </button>

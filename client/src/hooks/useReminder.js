@@ -30,7 +30,7 @@ export function useReminder() {
         if (result === 'shown') {
           toast('Time to write in your diary ✍️', { icon: '⏰' });
         } else {
-          toast('Daily reminder: write today\u2019s entry ✍️', { icon: '⏰' });
+          toast('Time for today\u2019s entry ✍️', { icon: '⏰' });
         }
       } catch (_) {}
     };

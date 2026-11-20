@@ -102,7 +102,7 @@ export default function Account() {
       if (settings.enabled && notificationState() === 'granted') {
         try {
           await connectPhonePush(settings.time);
-          toast.success('This phone connected for reminders ✅');
+          toast.success('This phone will get reminders ✅');
         } catch (_) {
           // Stays off — toggling the switch off/on retries (user gesture)
         }
@@ -142,14 +142,14 @@ export default function Account() {
       // Enabling — need permission first, then register this phone with the server
       let p = notificationState();
       if (p === 'unsupported') {
-        toast.error('Notifications are not supported in this browser');
+        toast.error("Your browser can't show reminders");
         return;
       }
       if (p !== 'granted') {
         p = await requestNotificationPermission();
         setPerm(p);
         if (p !== 'granted') {
-          toast.error('Allow notifications to enable reminders');
+          toast.error('Please turn on reminders to continue');
           return;
         }
       }
@@ -197,7 +197,7 @@ export default function Account() {
           await apiClient.put('/push/state', { time: next, tzOffset: new Date().getTimezoneOffset() });
         }
       } catch (_) {
-        toast.error("Time saved here, but it didn't reach everywhere. Check your internet.");
+        toast.error("Time saved on this phone, but not on your other devices. Check your internet and try again.");
       }
     }
   };
@@ -208,7 +208,7 @@ export default function Account() {
       await apiClient.delete('/push/unsubscribe', { data: { endpoint: sub?.endpoint } });
       await unsubscribeDevicePush();
       setPhonePush('off');
-      toast.success('Reminders removed from this phone');
+      toast.success('Reminders turned off for this phone');
     } catch (_) {
       toast.error("Couldn't remove reminders from this phone");
     }
@@ -223,12 +223,12 @@ export default function Account() {
         const next = await requestNotificationPermission();
         setPerm(next);
         if (next !== 'granted') {
-          toast.error('Allow notifications to preview the reminder');
+          toast.error('Please turn on reminders to see a preview');
           return;
         }
       }
       await fireReminderNotification();
-      toast.success('Reminder preview sent 🔔');
+      toast.success("Here is what your reminder will look like 🔔");
     } finally {
       setTesting(false);
     }
@@ -255,12 +255,12 @@ export default function Account() {
   const handleRemovePin = async () => {
     await removePin();
     setPinSet(false);
-    toast.success('PIN removed from this device');
+    toast.success('PIN removed');
   };
 
   const handleLogout = async () => {
     await logout();
-    toast.success('Goodbye!');
+    toast.success('Signed out. See you soon!');
     navigate('/login');
   };
 
@@ -303,7 +303,7 @@ export default function Account() {
 
         <div className="space-y-4">
           {/* Profile */}
-          <Card icon={User} title="Profile" subtitle="Changing your name won't touch your entries">
+          <Card icon={User} title="Profile" subtitle="Changing your name won't change your entries">
             <label className="text-[11px] uppercase tracking-widest font-medium" style={{ color: 'var(--text-ghost)' }}>
               Username
             </label>
@@ -341,7 +341,7 @@ export default function Account() {
               label="Remind me every day"
               hint={
                 reminder.enabled
-                  ? `Fires once a day at ${formatTime12(reminder.time)} · ${phonePush === 'on' ? 'connected ✅' : phonePush === 'off' ? 'not connected' : '…'}` 
+                  ? `Reminds you once a day at ${formatTime12(reminder.time)} · ${phonePush === 'on' ? 'On ✅' : phonePush === 'off' ? 'Off' : '…'}` 
                   : 'Off'
               }
               right={
@@ -366,7 +366,7 @@ export default function Account() {
                   Reminder time · <span style={{ color: 'var(--gold)', fontWeight: 600 }}>{formatTime12(reminder.time)}</span>
                 </p>
                 <p className="text-[11px]" style={{ color: 'var(--text-ghost)' }}>
-                  {perm === 'unsupported' ? 'Not supported in this browser' : perm === 'denied' ? 'Blocked — enable in browser site settings' : perm === 'granted' ? 'Notifications allowed' : 'Permission will be asked when you enable'}
+                  {perm === 'unsupported' ? "Can't show reminders here" : perm === 'denied' ? 'Blocked — turn on reminders in your browser settings' : perm === 'granted' ? 'Reminders allowed' : "We'll ask for permission when you turn it on"}
                 </p>
               </div>
               <input
@@ -384,7 +384,7 @@ export default function Account() {
                 className="mt-1 flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-xl text-xs font-medium cursor-pointer"
                 style={{ background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-ghost)' }}
               >
-                Remove this phone from reminders
+                Stop reminders on this phone
               </button>
             )}
             <button
@@ -395,15 +395,15 @@ export default function Account() {
               style={{ background: 'var(--gold-glow)', border: '1px solid var(--border-bright)', color: 'var(--gold)' }}
             >
               {testing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : reminder.enabled ? <Bell className="w-3.5 h-3.5" /> : <BellOff className="w-3.5 h-3.5" />}
-              {testing ? 'Sending…' : 'Send test notification'}
+              {testing ? 'Sending preview…' : 'Send a preview'}
             </button>
           </Card>
 
           {/* Appearance */}
           <Card icon={Palette} title="Appearance" subtitle="Theme and background">
             <Row
-              label={isDark ? 'Dark mode' : 'Light mode'}
-              hint="Applies instantly"
+              label={isDark ? 'Dark theme' : 'Light theme'}
+              hint="Changes right away"
               right={
                 <button
                   type="button"
@@ -417,7 +417,7 @@ export default function Account() {
               }
             />
             <Row
-              label="Wallpaper"
+              label="Background"
               hint={`Current: ${currentWallpaperName}`}
               right={
                 <button
@@ -434,10 +434,10 @@ export default function Account() {
           </Card>
 
           {/* Security */}
-          <Card icon={ShieldCheck} title="Security" subtitle="PIN lock lives only on this device">
+          <Card icon={ShieldCheck} title="Security" subtitle="Your PIN only works on this phone">
             <Row
               label="PIN lock"
-              hint={pinSet ? 'Set on this device' : 'Not set'}
+              hint={pinSet ? 'On for this phone' : 'Off'}
               right={
                 pinSet ? (
                   <div className="flex items-center gap-2">
