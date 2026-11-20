@@ -36,9 +36,9 @@ function sanitizeTimes(input) {
 }
 
 // Effective reminder times for a subscription (prefers `times`, falls back
-// to the legacy single `time`).
+// to the legacy single `time` only when `times` was never stored).
 function effectiveTimes(sub) {
-  if (Array.isArray(sub.times) && sub.times.length > 0) return sub.times;
+  if (Array.isArray(sub.times)) return sub.times;
   return [isValidTime(sub.time) ? sub.time : '21:00'];
 }
 
@@ -101,9 +101,8 @@ router.put('/state', protect, async (req, res) => {
     if (typeof enabled === 'boolean') update.enabled = enabled;
     if (times !== undefined) {
       const list = sanitizeTimes(times);
-      if (list.length === 0) return res.status(400).json({ message: 'Invalid times (HH:MM)' });
       update.times = list;
-      update.time = list[0];
+      update.time = list[0] || '21:00';
       // Changed times today should still fire — clear today's fired marks
       update.firedTimes = {};
       update.lastFiredDay = '';

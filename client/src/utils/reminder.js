@@ -60,7 +60,6 @@ export function saveReminderSettings(settings) {
   const current = getReminderSettings();
   const next = { ...current, ...settings };
   if (settings.times !== undefined) next.times = normalizeTimes(settings.times);
-  if (next.times.length === 0) next.times = ['21:00'];
   try {
     localStorage.setItem(KEY, JSON.stringify(next));
   } catch (_) {}

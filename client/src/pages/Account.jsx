@@ -212,9 +212,12 @@ export default function Account() {
     // ── Native APK path: OS-level notifications (no web push in WebView)
     if (isNative()) {
       if (!reminder.enabled) {
+        // Seed a default time if the list was emptied before
+        const times = (reminder.times || []).length > 0 ? reminder.times : ['21:00'];
+        if (times !== reminder.times) persistReminder({ times });
         setPushBusy(true);
         try {
-          const ok = await scheduleNativeDaily(reminder.times);
+          const ok = await scheduleNativeDaily(times);
           if (!ok) {
             toast.error('Notifications are blocked. Allow them in phone Settings > Apps > Diary, then try again.');
             setPhonePush('off');
@@ -224,7 +227,7 @@ export default function Account() {
           setPhonePush('on');
           setNativePerm('granted');
           persistReminder({ enabled: true });
-          toast.success(`Reminders set (${reminder.times.length}) ✅`);
+          toast.success(`Reminders set (${times.length}) ✅`);
         } catch (err) {
           console.error('Native reminder failed:', err);
           const reason = String(err?.message || '').slice(0, 90);
@@ -266,9 +269,11 @@ export default function Account() {
       }
       setPushBusy(true);
       try {
-        await connectPhonePush(reminder.times);
-        persistReminder({ enabled: true });
-        toast.success(`Reminders set (${reminder.times.length}) ✅`);
+        // Seed a default time if the list was emptied before
+        const times = (reminder.times || []).length > 0 ? reminder.times : ['21:00'];
+        await connectPhonePush(times);
+        persistReminder({ times, enabled: true });
+        toast.success(`Reminders set (${times.length}) ✅`);
       } catch (err) {
         console.error('Enable reminder failed:', err);
         setPhonePush('unsupported');
@@ -318,7 +323,18 @@ export default function Account() {
   const handleRemoveTime = async (time) => {
     const list = (reminder.times || []).filter((t) => t !== time);
     if (list.length === 0) {
-      toast.error('Keep at least one reminder time, or turn reminders off');
+      // No times left = reminders off
+      persistReminder({ times: [], enabled: false });
+      setPhonePush('off');
+      try {
+        if (isNative()) {
+          await cancelNativeDaily();
+        } else {
+          await apiClient.put('/push/state', { enabled: false });
+          await unsubscribeDevicePush().catch(() => {});
+        }
+      } catch (_) {}
+      toast.success('Reminders turned off');
       return;
     }
     persistReminder({ times: list });
