@@ -72,7 +72,7 @@ export default function AppSplash() {
 
   const name = user?.username || '';
   const title = name ? `Hey ${name}` : 'My Diary';
-  const subtitle = name ? `${name}, ${TAGLINE_BODIES[lineIdx]}` : 'Your private space for everyday moments';
+  const subtitle = name ? TAGLINE_BODIES[lineIdx] : 'Your private space for everyday moments';
 
   return (
     <div
