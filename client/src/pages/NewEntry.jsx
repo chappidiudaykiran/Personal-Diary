@@ -310,6 +310,14 @@ export default function NewEntry() {
     year: 'numeric',
   });
 
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/dashboard');
+    }
+  };
+
   return (
     <div className="h-dvh flex flex-col overflow-hidden transition-colors duration-200" style={{ background: 'var(--bg-app)' }}>
       <Navbar />
@@ -317,7 +325,7 @@ export default function NewEntry() {
       <main className="flex-1 min-h-0 w-full max-w-3xl mx-auto px-3 sm:px-6 py-3 sm:py-6 flex flex-col">
         {/* Back */}
         <button
-          onClick={() => navigate(-1)}
+          onClick={handleBack}
           className="flex items-center gap-1.5 text-sm mb-3 flex-shrink-0 self-start transition-colors cursor-pointer"
           style={{ color: topMuted }}
           onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--gold)'; }}

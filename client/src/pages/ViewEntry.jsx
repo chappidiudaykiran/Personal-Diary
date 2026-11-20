@@ -68,6 +68,17 @@ export default function ViewEntry() {
   const editingRef = useRef(false);
   editingRef.current = editing;
 
+  // ─── Back: go to where you came from, fallback to diary ───────────────────
+  // navigate(-1) alone can close the app / land on a blank page when the
+  // entry was opened directly (no history). Fall back to /dashboard then.
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/dashboard');
+    }
+  };
+
   // ─── Load & decrypt entry ──────────────────────────────────────────────────
   // Two phases: paint title + text immediately after decrypt, then fill in
   // media metas (and any legacy unreferenced attachments) in the background.
@@ -301,7 +312,7 @@ export default function ViewEntry() {
       <main className="flex-1 min-h-0 w-full max-w-3xl mx-auto px-3 sm:px-6 py-3 sm:py-6 flex flex-col">
         {/* Back */}
         <button
-          onClick={() => navigate('/dashboard')}
+          onClick={handleBack}
           className="flex items-center gap-1.5 text-sm mb-3 flex-shrink-0 self-start transition-colors cursor-pointer"
           style={{ color: topMuted }}
           onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--gold)'; }}

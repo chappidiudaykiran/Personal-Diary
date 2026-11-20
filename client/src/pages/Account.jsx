@@ -378,13 +378,21 @@ export default function Account() {
   const currentWallpaperName =
     presets.find((p) => p.id === wallpaper)?.name || (wallpaper === 'custom' ? 'My photo' : wallpaper);
 
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/dashboard');
+    }
+  };
+
   return (
     <div className="min-h-screen transition-colors duration-200" style={{ background: 'var(--bg-app)' }}>
       <Navbar />
 
       <main className="max-w-2xl mx-auto px-4 sm:px-6 pt-6 pb-16">
         <button
-          onClick={() => navigate(-1)}
+          onClick={handleBack}
           className="flex items-center gap-1.5 text-sm mb-4 cursor-pointer"
           style={{ color: topMuted }}
         >

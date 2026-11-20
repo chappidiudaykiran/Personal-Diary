@@ -9,6 +9,7 @@ on:
     paths:
       - 'client/src/**'
       - 'client/android/**'
+      - 'client/capacitor.config.json'
       - 'client/package*.json'
       - '.github/workflows/build-apk.yml'
 

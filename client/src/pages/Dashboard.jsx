@@ -1,9 +1,10 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, BookOpen, Search, X } from 'lucide-react';
+import { Plus, BookOpen, Search, X, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar.jsx';
 import EntryCard from '../components/EntryCard.jsx';
+import SetPinModal from '../components/SetPinModal.jsx';
 import apiClient from '../api/apiClient.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useWallpaper } from '../context/WallpaperContext.jsx';
@@ -27,13 +28,48 @@ function formatFullDate(date) {
 }
 
 export default function Dashboard() {
-  const { user, cryptoKey } = useAuth();
+  const { user, cryptoKey, lockApp, hasPin } = useAuth();
   const { topInk, topMuted, topGold } = useWallpaper();
   const [entries, setEntries] = useState([]);
   const [decryptedTitles, setDecryptedTitles] = useState({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [moodFilter, setMoodFilter] = useState('');
+  const [showPinPrompt, setShowPinPrompt] = useState(false);
+
+  // ─── Pull-down from top to lock ────────────────────────────────────────────
+  // Drag from the very top towards the bottom and release to lock the diary.
+  const [pullPx, setPullPx] = useState(0);
+  const dragStartY = useRef(null);
+  const PULL_THRESHOLD = 90;
+
+  const onTouchStart = (e) => {
+    if (window.scrollY <= 5 && e.touches.length === 1) {
+      dragStartY.current = e.touches[0].clientY;
+    }
+  };
+  const onTouchMove = (e) => {
+    if (dragStartY.current == null) return;
+    if (window.scrollY > 5) {
+      dragStartY.current = null;
+      setPullPx(0);
+      return;
+    }
+    const dy = e.touches[0].clientY - dragStartY.current;
+    if (dy > 0) setPullPx(Math.min(dy, 140));
+  };
+  const finishPull = () => {
+    if (pullPx >= PULL_THRESHOLD) {
+      if (hasPin) {
+        lockApp();
+        toast.success('Diary locked 🔒');
+      } else {
+        setShowPinPrompt(true);
+      }
+    }
+    dragStartY.current = null;
+    setPullPx(0);
+  };
 
   // ─── Fetch & decrypt entries with caching and fast rendering ───────────────
   // Stale-while-revalidate: paint localStorage cache instantly (works offline),
@@ -161,8 +197,37 @@ export default function Dashboard() {
   const hasFilters = Boolean(search || moodFilter);
 
   return (
-    <div className="min-h-screen transition-colors duration-200" style={{ background: 'var(--bg-app)' }}>
+    <div
+      className="min-h-screen transition-colors duration-200"
+      style={{ background: 'var(--bg-app)', touchAction: 'pan-y' }}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={finishPull}
+      onTouchCancel={finishPull}
+    >
       <Navbar />
+
+      {/* Pull-down lock indicator */}
+      {pullPx > 0 && (
+        <div
+          className="flex items-center justify-center overflow-hidden transition-none"
+          style={{ height: pullPx }}
+        >
+          <span
+            className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium"
+            style={{
+              background: pullPx >= PULL_THRESHOLD ? 'var(--gold)' : 'var(--bg-elevated)',
+              border: '1px solid var(--border-color)',
+              color: pullPx >= PULL_THRESHOLD ? '#0c0c17' : 'var(--text-muted)',
+              transform: `scale(${Math.min(1, 0.85 + pullPx / 300)})`,
+              opacity: Math.min(1, pullPx / 40),
+            }}
+          >
+            <Lock className="w-3.5 h-3.5" />
+            {pullPx >= PULL_THRESHOLD ? 'Release to lock' : 'Pull to lock'}
+          </span>
+        </div>
+      )}
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 pt-8 pb-16">
         {/* Header */}
@@ -385,6 +450,7 @@ export default function Dashboard() {
           </div>
         )}
       </main>
+      <SetPinModal isOpen={showPinPrompt} onClose={() => setShowPinPrompt(false)} />
     </div>
   );
 }
