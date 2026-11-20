@@ -8,6 +8,9 @@ import { ThemeProvider, useTheme } from './context/ThemeContext.jsx';
 import { WallpaperProvider } from './context/WallpaperContext.jsx';
 import './index.css';
 
+// Signal to the instant boot frame in index.html that the app code loaded.
+window.__app_mounted = true;
+
 // One-time cleanup of caches from the old hand-written SW (v1/v2/v3)
 try {
   if ('caches' in window) {
