@@ -165,8 +165,8 @@ export async function fireReminderNotification() {
       : 'Take a minute to write today\u2019s entry.',
     tag: 'diary-daily-reminder',
     renotify: true,
-    icon: '/favicon.svg',
-    badge: '/favicon.svg',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
     // Read by sw-notif-click.js — tapping opens here
     data: { url: '/dashboard' },
     actions: [{ action: 'write', title: 'Write now' }],

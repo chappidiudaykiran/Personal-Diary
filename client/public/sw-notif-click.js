@@ -12,8 +12,8 @@ self.addEventListener('push', (event) => {
     body: data.body || 'Take a minute to write today\u2019s entry.',
     tag: 'diary-daily-reminder',
     renotify: true,
-    icon: '/favicon.svg',
-    badge: '/favicon.svg',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
     data: { url: (data && data.url) || '/dashboard' },
   };
   event.waitUntil(self.registration.showNotification(title, options));
