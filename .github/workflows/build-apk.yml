@@ -1,0 +1,53 @@
+name: build-apk
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'client/src/**'
+      - 'client/android/**'
+      - 'client/package*.json'
+      - '.github/workflows/build-apk.yml'
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install client deps
+        working-directory: client
+        run: npm ci
+
+      - name: Build web
+        working-directory: client
+        run: npm run build
+
+      - name: Cap sync
+        working-directory: client
+        run: npx cap sync android
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Build debug APK
+        working-directory: client/android
+        run: ./gradlew assembleDebug --console=plain
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: diary-debug-apk
+          path: client/android/app/build/outputs/apk/debug/app-debug.apk
