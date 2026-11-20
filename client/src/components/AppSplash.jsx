@@ -62,9 +62,16 @@ export default function AppSplash() {
     document.getElementById('boot-splash')?.remove();
     const fadeTimer = setTimeout(() => setFading(true), 2500);
     const hideTimer = setTimeout(() => setVisible(false), 3000);
+    // Absolute backup: backgrounded tabs throttle timers, so never let the
+    // splash stick around forever and look like the app is frozen.
+    const forceTimer = setTimeout(() => {
+      document.getElementById('boot-splash')?.remove();
+      setVisible(false);
+    }, 6000);
     return () => {
       clearTimeout(fadeTimer);
       clearTimeout(hideTimer);
+      clearTimeout(forceTimer);
     };
   }, []);
 

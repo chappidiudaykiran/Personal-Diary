@@ -32,19 +32,35 @@ export const AuthProvider = ({ children }) => {
   const [tempPassword, setTempPassword] = useState(null); // Used right after login to set a PIN seamlessly
   const [showPinSetup, setShowPinSetup] = useState(false);
 
-  // Restore user session and check if PIN locked
+  // Restore user session and check if PIN locked.
+  // Crash-safe: corrupt localStorage must never leave the app stuck on
+  // the "Opening your diary…" loading screen.
   useEffect(() => {
-    const savedUser = localStorage.getItem('user');
-    const savedToken = localStorage.getItem('accessToken');
-    const pinVault = localStorage.getItem('diary_pin_vault');
+    try {
+      const savedUser = localStorage.getItem('user');
+      const savedToken = localStorage.getItem('accessToken');
+      const pinVault = localStorage.getItem('diary_pin_vault');
 
-    if (savedUser && savedToken) {
-      setUser(JSON.parse(savedUser));
-      if (pinVault) {
-        setIsLocked(true);
+      if (savedUser && savedToken) {
+        try {
+          setUser(JSON.parse(savedUser));
+        } catch (_) {
+          // Corrupt cache — clear so the app can boot to login.
+          localStorage.removeItem('user');
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          setUser(null);
+          return;
+        }
+        if (pinVault) {
+          setIsLocked(true);
+        }
       }
+    } catch (_) {
+      // Storage unavailable (private mode etc.) — boot to login anyway.
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   // Listen for forced logout events

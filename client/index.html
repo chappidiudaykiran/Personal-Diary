@@ -35,6 +35,26 @@
   <body>
     <div id="boot-splash"><img src="/icon-192.png" alt="My Diary" fetchpriority="high" /></div>
     <div id="root"></div>
+    <script>
+      // Failsafe: if the module bundle fails to boot (bad cache, blocked
+      // JS, corrupt chunk), never leave a permanent black/logo screen.
+      // React removes #boot-splash on a healthy boot; this only fires if
+      // React never came alive. Shows a reload hint instead of hanging.
+      setTimeout(function () {
+        if (!document.getElementById('root')?.hasChildNodes()) {
+          var s = document.getElementById('boot-splash');
+          if (s) {
+            s.innerHTML =
+              '<div style="color:#e9c46a;font-family:system-ui;text-align:center;padding:24px">' +
+              '<p style="font-size:18px;margin:0 0 8px">Could not start the diary</p>' +
+              '<p style="font-size:13px;color:rgba(237,232,216,.7);margin:0 0 16px">The app files failed to load. Check your connection, then retry.</p>' +
+              '<button onclick="location.reload()" style="padding:10px 20px;border:0;border-radius:10px;font-weight:700;background:#dba84a;color:#0c0c17">Reload</button></div>';
+          }
+        } else {
+          document.getElementById('boot-splash')?.remove();
+        }
+      }, 8000);
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
