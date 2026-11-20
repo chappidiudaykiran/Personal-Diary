@@ -4,6 +4,7 @@ import { useAuth } from './context/AuthContext.jsx';
 import LockScreen from './components/LockScreen.jsx';
 import SetPinModal from './components/SetPinModal.jsx';
 import apiClient from './api/apiClient.js';
+import { useReminder } from './hooks/useReminder.js';
 
 // Code-split routes so first load is small and repeat loads come from SW cache
 const Login = lazy(() => import('./pages/Login.jsx'));
@@ -11,6 +12,7 @@ const Register = lazy(() => import('./pages/Register.jsx'));
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const NewEntry = lazy(() => import('./pages/NewEntry.jsx'));
 const ViewEntry = lazy(() => import('./pages/ViewEntry.jsx'));
+const Account = lazy(() => import('./pages/Account.jsx'));
 
 function RouteLoader() {
   return (
@@ -60,6 +62,9 @@ export default function App() {
     apiClient.get('/health').catch(() => {});
   }, []);
 
+  // Daily diary reminder while the app is open/installed
+  useReminder();
+
   return (
     <>
       <Suspense fallback={<RouteLoader />}>
@@ -70,6 +75,7 @@ export default function App() {
           <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
           <Route path="/entry/new" element={<PrivateRoute><NewEntry /></PrivateRoute>} />
           <Route path="/entry/:id" element={<PrivateRoute><ViewEntry /></PrivateRoute>} />
+          <Route path="/account" element={<PrivateRoute><Account /></PrivateRoute>} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </Suspense>

@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { body, validationResult } = require('express-validator');
+const { protect } = require('../middleware/auth');
 const User = require('../models/User');
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -196,6 +197,71 @@ router.post('/refresh', async (req, res) => {
     res.status(401).json({ message: 'Invalid refresh token' });
   }
 });
+
+// ─── GET /api/auth/me ─────────────────────────────────────────────────────────
+router.get('/me', protect, async (req, res) => {
+  try {
+    res.json({
+      user: {
+        id: req.user._id,
+        username: req.user.username,
+        email: req.user.email,
+        encSalt: req.user.encSalt,
+        createdAt: req.user.createdAt,
+      },
+    });
+  } catch (error) {
+    console.error('Me error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ─── PUT /api/auth/profile ────────────────────────────────────────────────────
+// Safe to change: username is not used for encryption (only password+encSalt).
+router.put(
+  '/profile',
+  protect,
+  [body('username').trim().isLength({ min: 3, max: 30 }).withMessage('Username must be 3–30 characters')],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        message: errors.array()[0].msg,
+        errors: errors.array(),
+      });
+    }
+
+    const cleanUsername = (req.body.username || '').trim();
+
+    try {
+      const escaped = cleanUsername.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const existing = await User.findOne({
+        _id: { $ne: req.user._id },
+        username: new RegExp(`^${escaped}$`, 'i'),
+      });
+      if (existing) {
+        return res.status(409).json({ message: 'Username taken' });
+      }
+
+      req.user.username = cleanUsername;
+      await req.user.save();
+
+      res.json({
+        message: 'Profile updated',
+        user: {
+          id: req.user._id,
+          username: req.user.username,
+          email: req.user.email,
+          encSalt: req.user.encSalt,
+          createdAt: req.user.createdAt,
+        },
+      });
+    } catch (error) {
+      console.error('Update profile error:', error);
+      res.status(500).json({ message: 'Server error while updating profile' });
+    }
+  }
+);
 
 // ─── POST /api/auth/logout ────────────────────────────────────────────────────
 router.post('/logout', async (req, res) => {

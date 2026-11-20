@@ -114,6 +114,24 @@ export const AuthProvider = ({ children }) => {
   }, [user]);
 
   /**
+   * Update profile (username). Safe: username is not used for encryption.
+   */
+  const updateProfile = useCallback(async ({ username }) => {
+    const { data } = await apiClient.put('/auth/profile', { username });
+    localStorage.setItem('user', JSON.stringify(data.user));
+    setUser(data.user);
+    return data.user;
+  }, []);
+
+  /**
+   * Remove the PIN lock from this device.
+   */
+  const removePin = useCallback(async () => {
+    localStorage.removeItem('diary_pin_vault');
+    return true;
+  }, []);
+
+  /**
    * Lock the app immediately
    */
   const lockApp = useCallback(() => {
@@ -165,6 +183,8 @@ export const AuthProvider = ({ children }) => {
         setPin,
         unlockWithPin,
         lockApp,
+        updateProfile,
+        removePin,
       }}
     >
       {children}

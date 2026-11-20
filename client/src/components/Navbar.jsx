@@ -105,15 +105,27 @@ export default function Navbar() {
               <span className="hidden sm:inline">New Entry</span>
             </Link>
 
+            {/* Account */}
+            <Link
+              to="/account"
+              className="nav-icon-btn p-2 rounded-lg transition-all duration-150 cursor-pointer"
+              style={{ color: topInk }}
+              title="Account & settings"
+            >
+              <User className="w-4 h-4" />
+            </Link>
+
             {/* User chip */}
             {user && (
-              <div
-                className="hidden sm:flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg"
+              <Link
+                to="/account"
+                className="hidden sm:flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg transition-colors hover:underline"
                 style={{ color: topMuted }}
+                title="Account & settings"
               >
                 <User className="w-3 h-3" />
                 <span className="max-w-[90px] truncate">{user.username}</span>
-              </div>
+              </Link>
             )}
 
             {/* Logout */}
