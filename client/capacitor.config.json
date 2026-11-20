@@ -3,12 +3,7 @@
   "appName": "Personal Diary",
   "webDir": "dist",
   "bundledWebRuntime": false,
-  "server": {
-    "url": "https://personaldiary15.vercel.app",
-    "cleartext": false,
-    "androidScheme": "https",
-    "allowNavigation": ["personaldiary15.vercel.app"]
-  },
+  "androidScheme": "https",
   "plugins": {
     "SplashScreen": {
       "launchShowDuration": 0,
