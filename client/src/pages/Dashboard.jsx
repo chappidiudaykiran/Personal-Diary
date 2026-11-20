@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useWallpaper } from '../context/WallpaperContext.jsx';
 import { decrypt } from '../crypto/cryptoUtils.js';
 import { MOODS } from '../components/MoodPicker.jsx';
+import { entryDayKey, todayLocalKey, isValidDateKey, formatDateKey } from '../utils/entryDate.js';
 import {
   getReminderSettings,
   notificationState,
@@ -42,6 +43,9 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [moodFilter, setMoodFilter] = useState('');
+  // Jump to a particular day: filters the list to that diary day and offers
+  // a one-tap "write for this day" when nothing exists yet.
+  const [dayFilter, setDayFilter] = useState('');
   const [showPinPrompt, setShowPinPrompt] = useState(false);
   // One-tap reminder allow prompt — reminders are ON by default for new
   // installs, but the phone needs one tap on Allow (OS rule).
@@ -239,12 +243,13 @@ export default function Dashboard() {
       const title = decryptedTitles[entry._id] || '';
       const titleMatch = !search || title.toLowerCase().includes(search.toLowerCase());
       const moodMatch = !moodFilter || entry.mood === moodFilter;
-      return titleMatch && moodMatch;
+      const dayMatch = !dayFilter || entryDayKey(entry) === dayFilter;
+      return titleMatch && moodMatch && dayMatch;
     });
-  }, [entries, decryptedTitles, search, moodFilter]);
+  }, [entries, decryptedTitles, search, moodFilter, dayFilter]);
 
   const now = new Date();
-  const hasFilters = Boolean(search || moodFilter);
+  const hasFilters = Boolean(search || moodFilter || dayFilter);
 
   return (
     <div
@@ -419,6 +424,64 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* Day filter — pick any day, see what you wrote, or backfill it */}
+        {entries.length > 0 && (
+          <div className="flex items-center gap-2 mt-3 flex-wrap fade-up" style={{ animationDelay: '0.07s' }}>
+            <div className="relative">
+              <input
+                type="date"
+                value={dayFilter}
+                max={todayLocalKey()}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (!v) {
+                    setDayFilter('');
+                  } else if (isValidDateKey(v)) {
+                    setDayFilter(v);
+                  }
+                }}
+                className="pl-3 pr-2 py-2 rounded-xl text-xs outline-none cursor-pointer"
+                style={{
+                  background: dayFilter ? 'var(--gold-glow)' : 'var(--bg-input)',
+                  border: dayFilter ? '1px solid var(--border-bright)' : '1px solid var(--border-color)',
+                  color: dayFilter ? 'var(--gold)' : 'var(--text-muted)',
+                  colorScheme: 'dark',
+                }}
+                title="Jump to a day"
+              />
+            </div>
+            {dayFilter ? (
+              <>
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  {filtered.length === 0
+                    ? `Nothing written on ${formatDateKey(dayFilter)} yet`
+                    : `${filtered.length} ${filtered.length === 1 ? 'entry' : 'entries'} on ${formatDateKey(dayFilter)}`}
+                </span>
+                <Link
+                  to={`/entry/new?date=${dayFilter}`}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer"
+                  style={{ background: 'linear-gradient(135deg, #c4913a, #dba84a)', color: '#0c0c17' }}
+                >
+                  <Plus className="w-3 h-3" />
+                  Write for this day
+                </Link>
+                <button
+                  onClick={() => setDayFilter('')}
+                  className="flex items-center gap-1 text-xs cursor-pointer"
+                  style={{ color: 'var(--gold)' }}
+                >
+                  <X className="w-3 h-3" />
+                  Clear
+                </button>
+              </>
+            ) : (
+              <span className="text-[11px]" style={{ color: 'var(--text-ghost)' }}>
+                Pick a day to revisit it — or write for a missed day
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Loading skeleton */}
         {loading && (
           <div
@@ -479,14 +542,44 @@ export default function Dashboard() {
         {/* No results */}
         {!loading && entries.length > 0 && filtered.length === 0 && (
           <div className="text-center py-16">
-            <p className="text-sm mb-3" style={{ color: 'var(--text-muted)' }}>No entries match your search.</p>
-            <button
-              onClick={() => { setSearch(''); setMoodFilter(''); }}
-              className="text-xs font-medium transition-colors cursor-pointer"
-              style={{ color: 'var(--gold)' }}
-            >
-              Clear filters
-            </button>
+            {dayFilter ? (
+              <>
+                <p className="text-sm mb-1" style={{ color: 'var(--text-muted)' }}>
+                  Nothing written on {formatDateKey(dayFilter)} yet.
+                </p>
+                <p className="text-xs mb-5" style={{ color: 'var(--text-ghost)' }}>
+                  Missed that day? Backfill it now — it will be filed under that date.
+                </p>
+                <div className="flex items-center justify-center gap-3">
+                  <Link
+                    to={`/entry/new?date=${dayFilter}`}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold shadow-sm"
+                    style={{ background: 'linear-gradient(135deg, #c4913a, #dba84a)', color: '#0c0c17' }}
+                  >
+                    <Plus className="w-4 h-4" />
+                    Write for this day
+                  </Link>
+                  <button
+                    onClick={() => { setSearch(''); setMoodFilter(''); setDayFilter(''); }}
+                    className="text-xs font-medium transition-colors cursor-pointer"
+                    style={{ color: 'var(--gold)' }}
+                  >
+                    Clear filters
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm mb-3" style={{ color: 'var(--text-muted)' }}>No entries match your search.</p>
+                <button
+                  onClick={() => { setSearch(''); setMoodFilter(''); setDayFilter(''); }}
+                  className="text-xs font-medium transition-colors cursor-pointer"
+                  style={{ color: 'var(--gold)' }}
+                >
+                  Clear filters
+                </button>
+              </>
+            )}
           </div>
         )}
 
@@ -495,7 +588,7 @@ export default function Dashboard() {
           <div className="flex items-center gap-2 mb-4 text-xs" style={{ color: 'var(--text-muted)' }}>
             <span>{filtered.length} {filtered.length === 1 ? 'entry' : 'entries'} found</span>
             <button
-              onClick={() => { setSearch(''); setMoodFilter(''); }}
+              onClick={() => { setSearch(''); setMoodFilter(''); setDayFilter(''); }}
               className="flex items-center gap-1 transition-colors cursor-pointer"
               style={{ color: 'var(--gold)' }}
             >

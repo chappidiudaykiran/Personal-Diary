@@ -35,6 +35,14 @@ const entrySchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    // The diary day this entry belongs to. Backdating is a first-class
+    // feature: users can pick any past day when writing. Entries written
+    // before this field existed fall back to createdAt (backfilled on read).
+    entryDate: {
+      type: Date,
+      default: Date.now,
+      index: true,
+    },
     // Optional unencrypted metadata — user controls whether to fill this
     mood: {
       type: String,
@@ -54,5 +62,6 @@ const entrySchema = new mongoose.Schema(
 
 // Ensure a user can only access their own entries
 entrySchema.index({ userId: 1, createdAt: -1 });
+entrySchema.index({ userId: 1, entryDate: -1 });
 
 module.exports = mongoose.model('Entry', entrySchema);

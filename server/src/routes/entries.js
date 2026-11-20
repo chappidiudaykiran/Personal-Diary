@@ -13,9 +13,22 @@ router.use(protect);
 // The server only returns ciphertext — decryption happens on the client.
 router.get('/', async (req, res) => {
   try {
+    // Self-healing backfill: entries written before entryDate existed get
+    // their diary day set to the day they were created on.
+    const missing = await Entry.find({ userId: req.user._id, entryDate: { $exists: false } })
+      .select('_id createdAt')
+      .lean();
+    if (missing.length > 0) {
+      await Entry.bulkWrite(
+        missing.map((m) => ({
+          updateOne: { filter: { _id: m._id }, update: { $set: { entryDate: m.createdAt } } },
+        }))
+      );
+    }
+
     const entries = await Entry.find({ userId: req.user._id })
-      .select('encryptedTitle iv ivContent mood wordCount createdAt updatedAt')
-      .sort({ createdAt: -1 })
+      .select('encryptedTitle iv ivContent mood wordCount entryDate createdAt updatedAt')
+      .sort({ entryDate: -1, createdAt: -1 })
       .lean();
 
     // Attach encrypted-media counts (server cannot know media types — encrypted)
@@ -71,12 +84,13 @@ router.post(
     body('ivContent').notEmpty().withMessage('ivContent is required'),
     body('mood').optional().isIn(['happy', 'sad', 'angry', 'neutral', 'excited', 'anxious', 'grateful', '']),
     body('wordCount').optional().isInt({ min: 0 }),
+    body('entryDate').optional().isISO8601().withMessage('entryDate must be a valid date'),
   ],
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-    const { encryptedTitle, encryptedContent, iv, ivContent, mood, wordCount } = req.body;
+    const { encryptedTitle, encryptedContent, iv, ivContent, mood, wordCount, entryDate } = req.body;
 
     try {
       const entry = await Entry.create({
@@ -87,6 +101,7 @@ router.post(
         ivContent,
         mood: mood || '',
         wordCount: wordCount || 0,
+        ...(entryDate ? { entryDate: new Date(entryDate) } : {}),
       });
 
       res.status(201).json({ message: 'Entry saved', entry });
@@ -109,17 +124,26 @@ router.put(
     body('ivContent').notEmpty().withMessage('ivContent is required'),
     body('mood').optional().isIn(['happy', 'sad', 'angry', 'neutral', 'excited', 'anxious', 'grateful', '']),
     body('wordCount').optional().isInt({ min: 0 }),
+    body('entryDate').optional().isISO8601().withMessage('entryDate must be a valid date'),
   ],
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-    const { encryptedTitle, encryptedContent, iv, ivContent, mood, wordCount } = req.body;
+    const { encryptedTitle, encryptedContent, iv, ivContent, mood, wordCount, entryDate } = req.body;
 
     try {
       const entry = await Entry.findOneAndUpdate(
         { _id: req.params.id, userId: req.user._id },
-        { encryptedTitle, encryptedContent, iv, ivContent, mood: mood || '', wordCount: wordCount || 0 },
+        {
+          encryptedTitle,
+          encryptedContent,
+          iv,
+          ivContent,
+          mood: mood || '',
+          wordCount: wordCount || 0,
+          ...(entryDate ? { entryDate: new Date(entryDate) } : {}),
+        },
         { new: true, runValidators: true }
       );
 

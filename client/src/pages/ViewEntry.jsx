@@ -159,6 +159,8 @@ export default function ViewEntry() {
       ivContent,
       mood,
       wordCount: countBlockWords(blocksToSave),
+      // Keep the diary day unchanged when editing text/mood.
+      ...(entry?.entryDate ? { entryDate: entry.entryDate } : {}),
     };
   };
 
@@ -302,7 +304,7 @@ export default function ViewEntry() {
 
   const currentMood = moodMap[mood];
   const wordCount = countBlockWords(blocks);
-  const createdAtDate = entry ? new Date(entry.createdAt) : new Date();
+  const createdAtDate = entry ? new Date(entry.entryDate || entry.createdAt) : new Date();
   const canSave = Boolean(title.trim()) && hasBlockContent(blocks);
 
   return (

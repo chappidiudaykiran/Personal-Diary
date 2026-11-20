@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, Loader2 } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, Save, Loader2, CalendarDays } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar.jsx';
 import MoodPicker from '../components/MoodPicker.jsx';
@@ -14,6 +14,12 @@ import { useKeyboardOpen } from '../hooks/useKeyboardOpen.js';
 import { useWallpaper } from '../context/WallpaperContext.jsx';
 import { friendlyServerError } from '../utils/friendlyError.js';
 import { saveDraftBlobs, loadDraftBlobs, clearDraftBlobs } from '../utils/draftMediaStore.js';
+import {
+  todayLocalKey,
+  isValidDateKey,
+  dateKeyToISO,
+  formatDateKey,
+} from '../utils/entryDate.js';
 import {
   createTextBlock,
   createMediaBlock,
@@ -29,6 +35,7 @@ import {
 export default function NewEntry() {
   const { cryptoKey, user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [uploadStatus, setUploadStatus] = useState('');
   const [saving, setSaving] = useState(false);
   // While the keyboard is open, hide footer + editor toolbar so typed text is fully visible
@@ -37,6 +44,12 @@ export default function NewEntry() {
 
   const userId = user?.id || user?._id || 'guest';
   const draftKey = `diary_draft_${userId}_new_entry`;
+  const todayKey = todayLocalKey();
+  // ?date=YYYY-MM-DD pre-selects the day (from the dashboard's day filter).
+  // Invalid or future dates fall back to today.
+  const paramDate = searchParams.get('date');
+  const initialDateKey =
+    isValidDateKey(paramDate) && paramDate <= todayKey ? paramDate : todayKey;
 
   // Synchronous first-render restore from localStorage — no effect timing
   // involved, so a saved draft can never be missed. Image blobs resolve async below.
@@ -54,6 +67,13 @@ export default function NewEntry() {
 
   const [title, setTitle] = useState(initialDraft?.title || '');
   const [mood, setMood] = useState(initialDraft?.mood || '');
+  // The diary day this entry belongs to — defaults to today, but any past
+  // day can be picked to backfill a missed day.
+  const [entryDate, setEntryDate] = useState(() =>
+    isValidDateKey(initialDraft?.entryDate) && initialDraft.entryDate <= todayKey
+      ? initialDraft.entryDate
+      : initialDateKey
+  );
   const [blocks, setBlocks] = useState(() => {
     if (initialDraft?.content) {
       try {
@@ -88,7 +108,7 @@ export default function NewEntry() {
     markRestored,
   } = useAutoSave({
     draftId: 'new_entry',
-    data: { title, content: draftContent, mood },
+    data: { title, content: draftContent, mood, entryDate },
   });
 
   // Mount: announce restore + resolve pending image markers against IndexedDB.
@@ -211,6 +231,7 @@ export default function NewEntry() {
       ivContent: contentIv,
       mood,
       wordCount: countBlockWords(blocksToSave),
+      entryDate: dateKeyToISO(entryDate),
     };
   };
 
@@ -302,13 +323,15 @@ export default function NewEntry() {
     }
   };
 
-  const today = new Date();
-  const dateLabel = today.toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  const isToday = entryDate === todayKey;
+  const dateLabel = isToday
+    ? new Date().toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    : formatDateKey(entryDate);
 
   const handleBack = () => {
     if (window.history.length > 1) {
@@ -349,14 +372,40 @@ export default function NewEntry() {
               style={{ background: 'linear-gradient(90deg, transparent, var(--gold), transparent)' }}
             />
 
-            {/* Date header */}
+            {/* Date header — tap the day picker to write for a past day */}
             <div
-              className="px-4 sm:px-8 pt-4 pb-3 flex-shrink-0"
+              className="px-4 sm:px-8 pt-4 pb-3 flex-shrink-0 flex items-center gap-2 flex-wrap"
               style={{ borderBottom: '1px solid var(--border-color)' }}
             >
+              <CalendarDays className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--gold)' }} />
               <p className="text-[11px] sm:text-xs uppercase tracking-widest font-medium" style={{ color: topMuted }}>
                 {dateLabel}
               </p>
+              {!isToday && (
+                <span
+                  className="text-[10px] uppercase tracking-widest font-semibold px-2 py-0.5 rounded-full"
+                  style={{ background: 'var(--gold-glow)', color: 'var(--gold)', border: '1px solid var(--border-bright)' }}
+                >
+                  Backdated entry
+                </span>
+              )}
+              <input
+                type="date"
+                value={entryDate}
+                max={todayKey}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (isValidDateKey(v) && v <= todayKey) setEntryDate(v);
+                }}
+                className="ml-auto text-[11px] sm:text-xs rounded-lg px-2 py-1 outline-none cursor-pointer"
+                style={{
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border-color)',
+                  color: topMuted,
+                  colorScheme: 'dark',
+                }}
+                title="Pick the day this entry belongs to"
+              />
             </div>
 
             {/* Title input */}

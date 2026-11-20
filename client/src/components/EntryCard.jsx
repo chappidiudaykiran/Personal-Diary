@@ -20,7 +20,7 @@ function formatDay(date) {
 
 export default function EntryCard({ entry, decryptedTitle, isDecrypting }) {
   const mood = moodMap[entry.mood];
-  const dateObj = new Date(entry.createdAt);
+  const dateObj = new Date(entry.entryDate || entry.createdAt);
   const title = decryptedTitle || entry.title || (isDecrypting ? 'Loading…' : 'Untitled Entry');
   const preview = entry.content ? entry.content.split('\n')[0].slice(0, 100) : '';
   const entryId = entry._id || entry.id;
