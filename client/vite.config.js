@@ -13,7 +13,7 @@ export default defineConfig({
       manifest: false, // we ship our own public/manifest.json
       workbox: {
         navigateFallback: 'index.html',
-        globPatterns: ['**/*.{js,css,html,svg,json}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,json}'],
         // Custom tap-to-open handler for reminder notifications
         importScripts: ['/sw-notif-click.js'],
         // If network is slow, fall back to cache fast instead of hanging

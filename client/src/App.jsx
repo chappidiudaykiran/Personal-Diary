@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext.jsx';
 import LockScreen from './components/LockScreen.jsx';
 import SetPinModal from './components/SetPinModal.jsx';
+import AppSplash from './components/AppSplash.jsx';
 import apiClient from './api/apiClient.js';
 import { useReminder } from './hooks/useReminder.js';
 
@@ -67,6 +68,7 @@ export default function App() {
 
   return (
     <>
+      <AppSplash />
       <Suspense fallback={<RouteLoader />}>
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
