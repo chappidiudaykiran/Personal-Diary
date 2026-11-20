@@ -430,7 +430,7 @@ export default function Dashboard() {
             date text is unreadable on phones in both themes, so we never
             show it. */}
         {entries.length > 0 && (
-          <div className="flex items-center gap-2 mt-3 flex-wrap fade-up" style={{ animationDelay: '0.07s' }}>
+          <div className="flex items-center gap-2 mt-3 mb-8 flex-wrap fade-up" style={{ animationDelay: '0.07s' }}>
             <div
               className="relative rounded-xl px-3 py-2 text-xs font-medium cursor-pointer"
               style={{
