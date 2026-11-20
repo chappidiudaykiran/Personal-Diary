@@ -1,4 +1,6 @@
 name: build-apk
+# Builds the debug APK and publishes it to the apk-debug release.
+# Run manually from Actions tab, or auto-runs on client/workflow pushes.
 
 on:
   workflow_dispatch:
