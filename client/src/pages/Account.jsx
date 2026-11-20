@@ -95,6 +95,18 @@ export default function Account() {
     getPushSubscription().then(async (sub) => {
       if (sub) {
         setPhonePush('on');
+        // Local sub exists but server may have lost it (DB reset) — re-sync.
+        try {
+          const { data } = await apiClient.get('/push/status');
+          if (data && data.count === 0) {
+            const settings = getReminderSettings();
+            if (settings.enabled && notificationState() === 'granted') {
+              await connectPhonePush(settings.time);
+            } else {
+              setPhonePush('off');
+            }
+          }
+        } catch (_) {}
         return;
       }
       setPhonePush('off');
@@ -156,7 +168,10 @@ export default function Account() {
       setPushBusy(true);
       try {
         await connectPhonePush(reminder.time);
+        persistReminder({ enabled: true });
+        toast.success(`Daily reminder set for ${formatTime12(reminder.time)} ✅`);
       } catch (err) {
+        console.error('Enable reminder failed:', err);
         setPhonePush('unsupported');
         toast.error(
           friendlyServerError(
@@ -167,8 +182,6 @@ export default function Account() {
       } finally {
         setPushBusy(false);
       }
-      persistReminder({ enabled: true });
-      toast.success(`Daily reminder set for ${formatTime12(reminder.time)} ✅`);
     } else {
       setPushBusy(true);
       try {
@@ -227,8 +240,12 @@ export default function Account() {
           return;
         }
       }
-      await fireReminderNotification();
-      toast.success("Here is what your reminder will look like 🔔");
+      const result = await fireReminderNotification();
+      if (result === 'shown') {
+        toast.success("Here is what your reminder will look like 🔔");
+      } else {
+        toast("Reminder is on — you'll see it here at the set time ⏰");
+      }
     } finally {
       setTesting(false);
     }

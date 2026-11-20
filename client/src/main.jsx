@@ -19,6 +19,17 @@ try {
   }
 } catch (_) {}
 
+// Register the push service worker explicitly (idempotent — same /sw.js
+// that registerSW.js registers). Fixes `serviceWorker.ready` hanging when
+// the auto-register script is cached/blocked, which broke reminders.
+try {
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
+    });
+  }
+} catch (_) {}
+
 function ThemedToaster() {
   const { isDark } = useTheme();
   return (

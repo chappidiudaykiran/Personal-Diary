@@ -92,10 +92,35 @@ function urlBase64ToUint8Array(base64String) {
   return output;
 }
 
+async function readyRegistration(timeoutMs = 8000) {
+  if (!('serviceWorker' in navigator)) return null;
+  try {
+    // If SW already registered (prod build), use it directly — faster than .ready
+    const existing = await navigator.serviceWorker.getRegistration();
+    if (existing) return existing;
+  } catch (_) {}
+  try {
+    // Dev server has no SW — try to register the prod one if it exists,
+    // otherwise fall through (local notifications still work via `new Notification`).
+    const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => null);
+    if (reg) return reg;
+  } catch (_) {}
+  try {
+    const ready = await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), timeoutMs)),
+    ]);
+    return ready;
+  } catch (_) {
+    return null;
+  }
+}
+
 export async function getPushSubscription() {
   try {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
-    const reg = await navigator.serviceWorker.ready;
+    const reg = await readyRegistration();
+    if (!reg?.pushManager) return null;
     return await reg.pushManager.getSubscription();
   } catch (_) {
     return null;
@@ -109,7 +134,10 @@ export async function subscribeDevicePush() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
     throw new Error('Reminders are not supported on this phone or browser');
   }
-  const reg = await navigator.serviceWorker.ready;
+  const reg = await readyRegistration();
+  if (!reg?.pushManager) {
+    throw new Error('Reminder worker is still starting. Reload the page and try again.');
+  }
   const existing = await reg.pushManager.getSubscription();
   if (existing) return existing;
   return reg.pushManager.subscribe({
@@ -145,7 +173,7 @@ export async function fireReminderNotification() {
   };
   try {
     if ('serviceWorker' in navigator) {
-      const reg = await navigator.serviceWorker.ready;
+      const reg = await readyRegistration(4000);
       // showNotification works for installed PWAs / controlled pages
       if (reg?.showNotification) {
         await reg.showNotification(title, options);

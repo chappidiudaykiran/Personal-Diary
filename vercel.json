@@ -1,6 +1,34 @@
 {
   "rewrites": [
     {
+      "source": "/sw.js",
+      "destination": "/sw.js"
+    },
+    {
+      "source": "/sw-notif-click.js",
+      "destination": "/sw-notif-click.js"
+    },
+    {
+      "source": "/workbox-:file*",
+      "destination": "/workbox-:file*"
+    },
+    {
+      "source": "/registerSW.js",
+      "destination": "/registerSW.js"
+    },
+    {
+      "source": "/manifest.json",
+      "destination": "/manifest.json"
+    },
+    {
+      "source": "/favicon.svg",
+      "destination": "/favicon.svg"
+    },
+    {
+      "source": "/icons.svg",
+      "destination": "/icons.svg"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
