@@ -66,15 +66,34 @@ export async function requestNotificationPermission() {
   }
 }
 
+function storedUsername() {
+  try {
+    const raw = localStorage.getItem('user');
+    if (!raw) return '';
+    const user = JSON.parse(raw);
+    return user?.username || '';
+  } catch (_) {
+    return '';
+  }
+}
+
 export async function fireReminderNotification() {
   if (!('Notification' in window) || Notification.permission !== 'granted') {
     return 'denied';
   }
-  const title = 'My Diary ✍️';
+  const name = storedUsername();
+  const title = name ? `Hey ${name}, time to write ✍️` : 'My Diary ✍️';
   const options = {
-    body: 'Take a minute to write today\u2019s entry.',
+    body: name
+      ? `${name}, take a minute to write today\u2019s entry.`
+      : 'Take a minute to write today\u2019s entry.',
     tag: 'diary-daily-reminder',
     renotify: true,
+    icon: '/favicon.svg',
+    badge: '/favicon.svg',
+    // Read by sw-notif-click.js — tapping opens here
+    data: { url: '/dashboard' },
+    actions: [{ action: 'write', title: 'Write now' }],
   };
   try {
     if ('serviceWorker' in navigator) {
@@ -85,11 +104,21 @@ export async function fireReminderNotification() {
         return 'shown';
       }
     }
-    new Notification(title, options);
+    new Notification(title, options).onclick = () => {
+      try {
+        window.focus();
+        if (window.location.pathname !== '/dashboard') window.location.assign('/dashboard');
+      } catch (_) {}
+    };
     return 'shown';
   } catch (_) {
     try {
-      new Notification(title, options);
+      new Notification(title, options).onclick = () => {
+        try {
+          window.focus();
+          if (window.location.pathname !== '/dashboard') window.location.assign('/dashboard');
+        } catch (_) {}
+      };
       return 'shown';
     } catch {
       return 'error';

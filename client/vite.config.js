@@ -14,6 +14,8 @@ export default defineConfig({
       workbox: {
         navigateFallback: 'index.html',
         globPatterns: ['**/*.{js,css,html,svg,json}'],
+        // Custom tap-to-open handler for reminder notifications
+        importScripts: ['/sw-notif-click.js'],
         // If network is slow, fall back to cache fast instead of hanging
         navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
