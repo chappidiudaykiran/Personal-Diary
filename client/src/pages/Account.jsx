@@ -308,6 +308,10 @@ export default function Account() {
     }
     persistReminder({ times: list });
     toast.success(`Reminder added for ${formatTime12(list[list.indexOf(newTime)] || newTime)} ✅`);
+    // Move the picker forward so the just-added time isn't shown by default
+    const [hh, mm] = (newTime || '21:00').split(':').map(Number);
+    const nextH = ((Number(hh) || 0) + 1) % 24;
+    setNewTime(`${String(nextH).padStart(2, '0')}:${String(Number(mm) || 0).padStart(2, '0')}`);
     await syncTimes(list);
   };
 
