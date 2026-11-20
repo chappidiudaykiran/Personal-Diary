@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 
 /**
- * Branded launch screen (~2.2s): logo pops into the center with a gold glow,
+ * Branded launch screen (~2.7s): logo pops into the center with a gold glow,
  * greets you by name, then fades and the diary opens.
  */
 export default function AppSplash() {
@@ -11,8 +11,8 @@ export default function AppSplash() {
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
-    const fadeTimer = setTimeout(() => setFading(true), 1700);
-    const hideTimer = setTimeout(() => setVisible(false), 2200);
+    const fadeTimer = setTimeout(() => setFading(true), 2200);
+    const hideTimer = setTimeout(() => setVisible(false), 2700);
     return () => {
       clearTimeout(fadeTimer);
       clearTimeout(hideTimer);
@@ -22,7 +22,7 @@ export default function AppSplash() {
   if (!visible) return null;
 
   const name = user?.username || '';
-  const title = name ? `Hey ${name} 👋` : 'My Diary';
+  const title = name ? `Hey ${name}` : 'My Diary';
   const subtitle = name
     ? 'Welcome back to your private space ✍️'
     : 'Your private space for everyday moments';
