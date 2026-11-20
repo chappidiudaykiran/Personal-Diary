@@ -7,7 +7,7 @@ import { useWallpaper } from '../context/WallpaperContext.jsx';
 export default function LockScreen() {
   const { user, unlockWithPin, logout } = useAuth();
   const { isDark, toggleTheme } = useTheme();
-  const { topInk, topMuted } = useWallpaper();
+  const { topInk, topMuted, wallpaper, customUrl, presets } = useWallpaper();
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
   const [unlocking, setUnlocking] = useState(false);
@@ -56,10 +56,18 @@ export default function LockScreen() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [pin, unlocking]);
 
+  // Paint the chosen wallpaper directly on the lock screen (same source as
+  // every other screen) instead of relying on the page behind it.
+  const preset = presets.find((p) => p.id === wallpaper);
+  const lockBg =
+    wallpaper === 'custom' && customUrl
+      ? `linear-gradient(var(--wallpaper-scrim), var(--wallpaper-scrim)), url("${customUrl}") center/cover no-repeat fixed`
+      : preset?.css || 'var(--bg-app)';
+
   return (
     <div
       className="fixed inset-0 z-50 flex flex-col items-center justify-between p-6 select-none transition-colors duration-200"
-      style={{ background: 'var(--bg-app)' }}
+      style={{ background: lockBg }}
     >
       {/* Top bar with theme toggle & switch account */}
       <div
