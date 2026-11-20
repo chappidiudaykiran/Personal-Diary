@@ -93,7 +93,7 @@ export default function Account() {
   const [showWallpaper, setShowWallpaper] = useState(false);
 
   const [reminder, setReminder] = useState(getReminderSettings);
-  const [newTime, setNewTime] = useState('21:00');
+  const [newTime, setNewTime] = useState('23:00');
   const [perm, setPerm] = useState('default');
   const [testing, setTesting] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
@@ -107,7 +107,7 @@ export default function Account() {
     if (isNative()) {
       getNativePermission().then(setNativePerm).catch(() => {});
       const settings = getReminderSettings();
-      if (settings.enabled) {
+      if (settings.enabled && settings.times.length > 0) {
         scheduleNativeDaily(settings.times).then((ok) => {
           setPhonePush(ok ? 'on' : 'off');
           getNativePermission().then(setNativePerm).catch(() => {});
@@ -137,7 +137,7 @@ export default function Account() {
       }
       setPhonePush('off');
       const settings = getReminderSettings();
-      if (settings.enabled && notificationState() === 'granted') {
+      if (settings.enabled && settings.times.length > 0 && notificationState() === 'granted') {
         try {
           await connectPhonePush(settings.times);
           toast.success('This phone will get reminders ✅');
@@ -178,7 +178,11 @@ export default function Account() {
     if (isNative()) {
       if (reminder.enabled) {
         try {
-          await scheduleNativeDaily(list);
+          if (list.length === 0) {
+            await cancelNativeDaily();
+          } else {
+            await scheduleNativeDaily(list);
+          }
         } catch (_) {
           toast.error("Couldn't update reminder times. Try again.");
         }
@@ -213,7 +217,7 @@ export default function Account() {
     if (isNative()) {
       if (!reminder.enabled) {
         // Seed a default time if the list was emptied before
-        const times = (reminder.times || []).length > 0 ? reminder.times : ['21:00'];
+        const times = (reminder.times || []).length > 0 ? reminder.times : ['23:00'];
         if (times !== reminder.times) persistReminder({ times });
         setPushBusy(true);
         try {
@@ -270,7 +274,7 @@ export default function Account() {
       setPushBusy(true);
       try {
         // Seed a default time if the list was emptied before
-        const times = (reminder.times || []).length > 0 ? reminder.times : ['21:00'];
+        const times = (reminder.times || []).length > 0 ? reminder.times : ['23:00'];
         await connectPhonePush(times);
         persistReminder({ times, enabled: true });
         toast.success(`Reminders set (${times.length}) ✅`);
@@ -322,22 +326,10 @@ export default function Account() {
 
   const handleRemoveTime = async (time) => {
     const list = (reminder.times || []).filter((t) => t !== time);
-    if (list.length === 0) {
-      // No times left = reminders off
-      persistReminder({ times: [], enabled: false });
-      setPhonePush('off');
-      try {
-        if (isNative()) {
-          await cancelNativeDaily();
-        } else {
-          await apiClient.put('/push/state', { enabled: false });
-          await unsubscribeDevicePush().catch(() => {});
-        }
-      } catch (_) {}
-      toast.success('Reminders turned off');
-      return;
-    }
+    // Removing the last time keeps reminders ON with zero entries
     persistReminder({ times: list });
+    setPhonePush(list.length === 0 ? 'off' : phonePush);
+    toast.success(list.length === 0 ? 'All times removed — reminders stay on' : 'Reminder removed');
     await syncTimes(list);
   };
 
@@ -513,7 +505,7 @@ export default function Account() {
               label="Remind me"
               hint={
                 reminder.enabled
-                  ? `${reminder.times.length} reminder${reminder.times.length === 1 ? '' : 's'}: ${reminder.times.map(formatTime12).join(', ')} · ${phonePush === 'on' ? 'On ✅' : phonePush === 'off' ? 'Off' : '…'}`
+                  ? `${reminder.times.length === 0 ? 'No times set — add one below' : `${reminder.times.length} reminder${reminder.times.length === 1 ? '' : 's'}: ${reminder.times.map(formatTime12).join(', ')}`} · ${phonePush === 'on' ? 'On ✅' : phonePush === 'off' ? 'Off' : '…'}`
                   : 'Off'
               }
               right={

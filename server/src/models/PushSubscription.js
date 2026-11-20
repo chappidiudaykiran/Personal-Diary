@@ -27,12 +27,12 @@ const pushSubscriptionSchema = new mongoose.Schema(
     // Reminder time in the user's local "HH:MM" (24h)
     time: {
       type: String,
-      default: '21:00',
+      default: '23:00',
     },
     // Any number of reminder times ("HH:MM"). Tick prefers this over `time`.
     times: {
       type: [String],
-      default: ['21:00'],
+      default: ['23:00'],
     },
     // new Date().getTimezoneOffset() at subscribe time (minutes, UTC - local)
     tzOffset: {

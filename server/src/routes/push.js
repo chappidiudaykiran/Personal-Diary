@@ -39,7 +39,7 @@ function sanitizeTimes(input) {
 // to the legacy single `time` only when `times` was never stored).
 function effectiveTimes(sub) {
   if (Array.isArray(sub.times)) return sub.times;
-  return [isValidTime(sub.time) ? sub.time : '21:00'];
+  return [isValidTime(sub.time) ? sub.time : '23:00'];
 }
 
 // ─── POST /api/push/subscribe ─────────────────────────────────────────────────
@@ -63,7 +63,7 @@ router.post(
     }
     const list = sanitizeTimes(times);
     if (list.length === 0 && isValidTime(time)) list.push(time);
-    if (list.length === 0) list.push('21:00');
+    if (list.length === 0) list.push('23:00');
     try {
       const existing = await PushSubscription.findOne({ endpoint: subscription.endpoint });
       const timesChanged =
@@ -102,7 +102,7 @@ router.put('/state', protect, async (req, res) => {
     if (times !== undefined) {
       const list = sanitizeTimes(times);
       update.times = list;
-      update.time = list[0] || '21:00';
+      update.time = list[0] || '23:00';
       // Changed times today should still fire — clear today's fired marks
       update.firedTimes = {};
       update.lastFiredDay = '';
@@ -163,7 +163,7 @@ function localDayAndMinutes(dateUtc, tzOffset) {
 }
 
 function toMinutes(hhmm) {
-  const [h, m] = (hhmm || '21:00').split(':').map(Number);
+  const [h, m] = (hhmm || '23:00').split(':').map(Number);
   return (h || 0) * 60 + (m || 0);
 }
 

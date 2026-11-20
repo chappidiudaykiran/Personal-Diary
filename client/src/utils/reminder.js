@@ -35,21 +35,25 @@ export function normalizeTimes(list) {
 }
 
 export function getReminderSettings() {
-  const fallback = { enabled: false, times: ['21:00'], fired: {} };
+  const fallback = { enabled: false, times: ['23:00'], fired: {} };
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return fallback;
     const parsed = JSON.parse(raw);
-    let times = normalizeTimes(parsed.times);
     let fired = parsed.fired && typeof parsed.fired === 'object' ? parsed.fired : {};
-    // Migrate legacy single-time shape { time, lastFired }
-    if (times.length === 0 && cleanTime(parsed.time)) {
+    let times;
+    if (Array.isArray(parsed.times)) {
+      // Explicit list — empty means the user removed every time (keep zero)
+      times = normalizeTimes(parsed.times);
+    } else if (cleanTime(parsed.time)) {
+      // Migrate legacy single-time shape { time, lastFired }
       times = [cleanTime(parsed.time)];
       if (parsed.lastFired) {
         fired = { ...fired, [`${parsed.lastFired}T${times[0]}`]: true };
       }
+    } else {
+      times = ['23:00'];
     }
-    if (times.length === 0) times = ['21:00'];
     return { enabled: Boolean(parsed.enabled), times, fired };
   } catch (_) {
     return fallback;
@@ -83,7 +87,7 @@ export function msUntilFire(settingsOrTime, now = new Date(), timeArg) {
   if (typeof settingsOrTime === 'string') {
     time = settingsOrTime;
   } else {
-    time = timeArg || (settingsOrTime && settingsOrTime.times && settingsOrTime.times[0]) || settingsOrTime.time || '21:00';
+    time = timeArg || (settingsOrTime && settingsOrTime.times && settingsOrTime.times[0]) || settingsOrTime.time || '23:00';
   }
   const [h, m] = (time || '21:00').split(':').map(Number);
   const target = new Date(now);
