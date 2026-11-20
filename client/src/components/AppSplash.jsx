@@ -31,7 +31,7 @@ export default function AppSplash() {
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center transition-opacity duration-500"
       style={{
-        background: 'radial-gradient(circle at 50% 42%, #23233a 0%, #14141f 55%, #0c0c17 100%)',
+        background: 'radial-gradient(circle at 50% 42%, #23233a 0%, #101018 55%, #000000 100%)',
         opacity: fading ? 0 : 1,
       }}
     >
