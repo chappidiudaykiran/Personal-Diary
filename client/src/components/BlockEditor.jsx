@@ -125,6 +125,22 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
   const [selectedKey, setSelectedKey] = useState(null);
   const mediaCount = blocks.filter((b) => b.type === 'media').length;
 
+  // Merge adjacent text blocks and collapse runs of empty text into one,
+  // so repeated "Text" taps never stack "Continue writing..." placeholders.
+  const tidyTextBlocks = (list) => {
+    const next = [];
+    for (const b of list) {
+      const prev = next[next.length - 1];
+      if (b.type === 'text' && prev?.type === 'text') {
+        if (!b.text && !prev.text) continue; // drop duplicate empty
+        next[next.length - 1] = { ...prev, text: `${prev.text || ''}${b.text || ''}` };
+      } else {
+        next.push(b);
+      }
+    }
+    return next;
+  };
+
   useEffect(() => {
     if (!focusKeyRef.current) return;
     const el = document.querySelector(`textarea[data-block-key="${focusKeyRef.current}"]`);
@@ -180,17 +196,32 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
   };
 
   const insertTextBlock = () => {
-    let index = blocks.findIndex((b) => b.key === activeRef.current.key);
-    if (index === -1) index = blocks.length - 1;
-    const tb = createTextBlock(''); const next = [...blocks.slice(0, index + 1), tb, ...blocks.slice(index + 1)];
+    const tidied = tidyTextBlocks(blocks);
+    if (tidied.length !== blocks.length) onChange(tidied);
+    const list = tidied;
+    let index = list.findIndex((b) => b.key === activeRef.current.key);
+    if (index === -1) index = list.length - 1;
+    const current = list[index];
+    // If the current or trailing text block is empty, just focus it
+    // instead of stacking another "Continue writing..." box.
+    if (current?.type === 'text' && !current.text) {
+      focusBlock(current.key);
+      return;
+    }
+    const last = list[list.length - 1];
+    if (last?.type === 'text' && !last.text && index === list.length - 1) {
+      focusBlock(last.key);
+      return;
+    }
+    const tb = createTextBlock(''); const next = [...list.slice(0, index + 1), tb, ...list.slice(index + 1)];
     onChange(next); focusBlock(tb.key);
   };
 
   const removeBlock = (index) => {
     const next = [...blocks]; next.splice(index, 1);
-    for (let i = 0; i < next.length - 1; i++) if (next[i].type === 'text' && next[i + 1].type === 'text') { next[i] = { ...next[i], text: `${next[i].text}${next[i + 1].text}` }; next.splice(i + 1, 1); i--; }
-    if (next.length === 0) next.push(createTextBlock(''));
-    setSelectedKey(null); onChange(next);
+    const tidied = tidyTextBlocks(next);
+    if (tidied.length === 0) tidied.push(createTextBlock(''));
+    setSelectedKey(null); onChange(tidied);
   };
 
   const setBlockWidth = (index, width) => {
