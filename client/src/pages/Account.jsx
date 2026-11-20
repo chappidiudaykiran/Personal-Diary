@@ -297,7 +297,7 @@ export default function Account() {
           </Card>
 
           {/* Daily reminder */}
-          <Card icon={Bell} title="Daily reminder" subtitle="Nudges you to write — fires while the app is open or installed">
+          <Card icon={Bell} title="Daily reminder">
             <Row
               label="Remind me every day"
               hint={
