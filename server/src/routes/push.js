@@ -94,6 +94,18 @@ router.delete('/unsubscribe', protect, async (req, res) => {
   }
 });
 
+// ─── GET /api/push/status ─────────────────────────────────────────────────────
+// How many of this user's devices are registered for reminders.
+router.get('/status', protect, async (req, res) => {
+  try {
+    const count = await PushSubscription.countDocuments({ userId: req.user._id, enabled: true });
+    res.json({ count });
+  } catch (error) {
+    console.error('Push status error:', error);
+    res.status(500).json({ message: 'Failed to get push status' });
+  }
+});
+
 function localDayAndMinutes(dateUtc, tzOffset) {
   // getTimezoneOffset() = UTC - local, so local = UTC - offset
   const local = new Date(dateUtc.getTime() - tzOffset * 60 * 1000);

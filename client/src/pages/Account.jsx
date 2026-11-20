@@ -86,13 +86,14 @@ export default function Account() {
   const [testing, setTesting] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
   const [phonePush, setPhonePush] = useState('unknown'); // on | off | unsupported | unknown
+  const [serverPhones, setServerPhones] = useState(null);
 
   useEffect(() => {
     setPerm(notificationState());
     getPushSubscription().then((sub) => {
       setPhonePush(sub ? 'on' : 'off');
     }).catch(() => setPhonePush('unknown'));
-    // Refresh profile (createdAt) + entry count
+    // Refresh profile (createdAt) + entry count + server-registered phones
     (async () => {
       try {
         const { data } = await apiClient.get('/auth/me');
@@ -102,8 +103,26 @@ export default function Account() {
         const { data } = await apiClient.get('/entries');
         setEntryCount((data.entries || []).length);
       } catch (_) {}
+      try {
+        const { data } = await apiClient.get('/push/status');
+        setServerPhones(data.count ?? 0);
+      } catch (_) {
+        setServerPhones(null);
+      }
     })();
   }, []);
+
+  /** Register this phone with the server for push reminders. */
+  const connectPhonePush = async (time) => {
+    const sub = await subscribeDevicePush();
+    await apiClient.post('/push/subscribe', {
+      subscription: sub.toJSON(),
+      time: time || reminder.time,
+      tzOffset: new Date().getTimezoneOffset(),
+    });
+    setPhonePush('on');
+    setServerPhones((n) => (n === null ? 1 : n + 1));
+  };
 
   const persistReminder = (next) => {
     setReminder(saveReminderSettings(next));
@@ -128,13 +147,7 @@ export default function Account() {
       }
       setPushBusy(true);
       try {
-        const sub = await subscribeDevicePush();
-        await apiClient.post('/push/subscribe', {
-          subscription: sub.toJSON(),
-          time: reminder.time,
-          tzOffset: new Date().getTimezoneOffset(),
-        });
-        setPhonePush('on');
+        await connectPhonePush(reminder.time);
       } catch (err) {
         setPhonePush('unsupported');
         toast.error(err?.response?.data?.message || err?.message || 'Phone push failed — local reminder only');
@@ -142,7 +155,7 @@ export default function Account() {
         setPushBusy(false);
       }
       persistReminder({ enabled: true });
-      toast.success(`Daily reminder set for ${reminder.time} ✅`);
+      toast.success(`Daily reminder set for ${formatTime12(reminder.time)} ✅`);
     } else {
       setPushBusy(true);
       try {
@@ -163,7 +176,13 @@ export default function Account() {
     persistReminder({ time: next });
     if (reminder.enabled) {
       try {
-        await apiClient.put('/push/state', { time: next, tzOffset: new Date().getTimezoneOffset() });
+        // If this phone was never registered (stale ON state), register it now
+        const existing = await getPushSubscription();
+        if (!existing) {
+          await connectPhonePush(next);
+        } else {
+          await apiClient.put('/push/state', { time: next, tzOffset: new Date().getTimezoneOffset() });
+        }
       } catch (_) {
         toast.error('Time saved on this phone, but server sync failed');
       }
@@ -345,6 +364,28 @@ export default function Account() {
                 style={{ background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', colorScheme: isDark ? 'dark' : 'light' }}
               />
             </div>
+            {reminder.enabled && phonePush !== 'on' && (
+              <button
+                type="button"
+                onClick={async () => {
+                  setPushBusy(true);
+                  try {
+                    await connectPhonePush(reminder.time);
+                    toast.success('This phone connected ✅ — reminders will arrive at the set time');
+                  } catch (err) {
+                    toast.error(err?.response?.data?.message || err?.message || 'Could not connect this phone');
+                  } finally {
+                    setPushBusy(false);
+                  }
+                }}
+                disabled={pushBusy}
+                className="mt-1 flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer disabled:opacity-50"
+                style={{ background: 'linear-gradient(135deg, #c4913a, #dba84a)', color: '#0c0c17' }}
+              >
+                {pushBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Bell className="w-3.5 h-3.5" />}
+                {pushBusy ? 'Connecting…' : 'Connect this phone for reminders'}
+              </button>
+            )}
             {phonePush === 'on' && (
               <button
                 type="button"
