@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect } from 'react';
+import React, { Suspense, lazy, useEffect, Component } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext.jsx';
 import LockScreen from './components/LockScreen.jsx';
@@ -6,6 +6,54 @@ import SetPinModal from './components/SetPinModal.jsx';
 import AppSplash from './components/AppSplash.jsx';
 import apiClient from './api/apiClient.js';
 import { useReminder } from './hooks/useReminder.js';
+
+// If a route chunk fails to download (flaky/slow network), React would
+// otherwise unmount to a dead black screen. Catch it: retry once
+// automatically, then show a reload screen instead of black.
+class RouteErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  componentDidCatch(error) {
+    console.error('Route failed to load:', error);
+    try {
+      const msg = String(error?.message || '');
+      const isChunk = /chunk|dynamically imported|importing a module/i.test(msg);
+      if (isChunk && !sessionStorage.getItem('route_retry')) {
+        sessionStorage.setItem('route_retry', '1');
+        window.location.reload();
+      }
+    } catch (_) {}
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6 text-center" style={{ background: '#000' }}>
+          <p className="font-display text-xl" style={{ color: '#e9c46a' }}>Couldn't open that screen</p>
+          <p className="text-sm" style={{ color: 'rgba(237,232,216,0.65)' }}>
+            Your connection dropped while loading. Your entries are safe.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              try { sessionStorage.removeItem('route_retry'); } catch (_) {}
+              window.location.reload();
+            }}
+            className="px-5 py-2.5 rounded-xl text-sm font-semibold cursor-pointer"
+            style={{ background: 'linear-gradient(135deg, #c4913a, #dba84a)', color: '#0c0c17' }}
+          >
+            Try again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // Code-split routes so first load is small and repeat loads come from SW cache
 const Login = lazy(() => import('./pages/Login.jsx'));
@@ -69,6 +117,7 @@ export default function App() {
   return (
     <>
       <AppSplash />
+      <RouteErrorBoundary>
       <Suspense fallback={<RouteLoader />}>
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -81,6 +130,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </Suspense>
+      </RouteErrorBoundary>
 
       <SetPinModal
         isOpen={showPinSetup}
