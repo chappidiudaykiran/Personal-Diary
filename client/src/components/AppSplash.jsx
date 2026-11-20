@@ -128,7 +128,7 @@ export default function AppSplash() {
           <h1 className="font-display text-3xl" style={{ fontWeight: 600, color: '#e9c46a' }}>
             {title}
           </h1>
-          <p className="text-sm mt-1" style={{ color: 'rgba(237,232,216,0.65)' }}>
+          <p className="text-2xl mt-2 leading-snug" style={{ color: 'rgba(237,232,216,0.85)' }}>
             {subtitle}
           </p>
         </div>
