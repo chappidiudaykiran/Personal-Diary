@@ -66,7 +66,7 @@ export default function AppSplash() {
             }}
           />
           <img
-            src="/icon-512.png"
+            src="/icon-192.png"
             alt="My Diary"
             className="w-36 h-36 rounded-full relative"
             style={{
