@@ -174,7 +174,11 @@ export default function Account() {
         setPushBusy(true);
         try {
           const ok = await scheduleNativeDaily(reminder.time);
-          if (!ok) throw new Error('native schedule failed');
+          if (!ok) {
+            toast.error('Notifications are blocked. Allow them in phone Settings > Apps > Diary, then try again.');
+            setPhonePush('off');
+            return;
+          }
           setPhonePush('on');
           persistReminder({ enabled: true });
           toast.success(`Daily reminder set for ${formatTime12(reminder.time)} ✅`);
@@ -276,11 +280,10 @@ export default function Account() {
     if (isNative()) {
       try {
         await cancelNativeDaily();
-        setPhonePush('off');
-        toast.success('Reminders turned off for this phone');
-      } catch (_) {
-        toast.error("Couldn't remove reminders from this phone");
-      }
+      } catch (_) {}
+      setPhonePush('off');
+      persistReminder({ enabled: false });
+      toast.success('Reminders turned off for this phone');
       return;
     }
     try {
@@ -299,7 +302,11 @@ export default function Account() {
     try {
       if (isNative()) {
         const ok = await previewNative();
-        toast.success(ok ? "Here is what your reminder will look like 🔔" : "Reminder preview coming in a few seconds 🔔");
+        if (ok) {
+          toast.success("Here is what your reminder will look like 🔔");
+        } else {
+          toast.error('Notifications are blocked. Allow them in phone Settings > Apps > Diary.');
+        }
         try {
           await fireReminderNotification();
         } catch (_) {}

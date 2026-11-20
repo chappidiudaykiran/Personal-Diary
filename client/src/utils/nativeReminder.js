@@ -27,14 +27,6 @@ export function isNative() {
   }
 }
 
-function nextDailyDate(hhmm) {
-  const [h, m] = (hhmm || '21:00').split(':').map(Number);
-  const d = new Date();
-  d.setHours(h || 0, m || 0, 0, 0);
-  if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1);
-  return d;
-}
-
 function username() {
   try {
     const raw = localStorage.getItem('user');
@@ -45,16 +37,30 @@ function username() {
   }
 }
 
+/** Returns true only if OS notifications are actually allowed. */
+export async function ensureNativePermission() {
+  const api = await ln();
+  if (!api) return false;
+  try {
+    const cur = await api.checkPermissions().catch(() => null);
+    if (cur?.display === 'granted') return true;
+    const req = await api.requestPermissions().catch(() => null);
+    return req?.display === 'granted';
+  } catch (_) {
+    return false;
+  }
+}
+
 /** Schedule (or reschedule) the daily native notification. */
 export async function scheduleNativeDaily(time) {
   const api = await ln();
   if (!api) return false;
-  try {
-    await api.requestPermissions();
-  } catch (_) {}
+  const allowed = await ensureNativePermission();
+  if (!allowed) return false;
   const name = username();
   try {
-    await api.cancel({ notifications: [{ id: 9001 }] }).catch(() => {});
+    await api.cancel({ notifications: [{ id: 9001 }, { id: 9002 }] }).catch(() => {});
+    const [hh, mm] = (time || '21:00').split(':').map(Number);
     await api.schedule({
       notifications: [
         {
@@ -65,7 +71,7 @@ export async function scheduleNativeDaily(time) {
             : "Take a minute to write today's entry.",
           schedule: {
             // Repeat every day at the chosen time, even if the app is closed
-            on: { hour: Number((time || '21:00').split(':')[0]), minute: Number((time || '21:00').split(':')[1]) },
+            on: { hour: Number(hh) || 0, minute: Number(mm) || 0 },
             allowWhileIdle: true,
           },
           smallIcon: 'ic_launcher',
@@ -73,20 +79,6 @@ export async function scheduleNativeDaily(time) {
         },
       ],
     });
-    // Fallback for devices that ignore `on:` repeats: also set one exact shot
-    try {
-      await api.schedule({
-        notifications: [
-          {
-            id: 9002,
-            title: name ? `Hey ${name}, time to write` : 'My Diary',
-            body: "Take a minute to write today's entry.",
-            schedule: { at: nextDailyDate(time), allowWhileIdle: true },
-            smallIcon: 'ic_launcher',
-          },
-        ],
-      });
-    } catch (_) {}
     return true;
   } catch (e) {
     console.error('Native schedule failed:', e);
@@ -98,7 +90,7 @@ export async function cancelNativeDaily() {
   const api = await ln();
   if (!api) return;
   try {
-    await api.cancel({ notifications: [{ id: 9001 }, { id: 9002 }] });
+    await api.cancel({ notifications: [{ id: 9001 }, { id: 9002 }, { id: 9999 }] });
   } catch (_) {}
 }
 
@@ -106,9 +98,8 @@ export async function cancelNativeDaily() {
 export async function previewNative() {
   const api = await ln();
   if (!api) return false;
-  try {
-    await api.requestPermissions();
-  } catch (_) {}
+  const allowed = await ensureNativePermission();
+  if (!allowed) return false;
   const name = username();
   try {
     await api.schedule({

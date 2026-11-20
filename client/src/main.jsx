@@ -24,9 +24,12 @@ try {
 // the auto-register script is cached/blocked, which broke reminders.
 try {
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
-    });
+    import('@capacitor/core').then(({ Capacitor }) => {
+      if (Capacitor.isNativePlatform()) return;
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
+      });
+    }).catch(() => {});
   }
 } catch (_) {}
 

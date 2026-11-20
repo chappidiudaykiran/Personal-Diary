@@ -51,7 +51,9 @@ export function useReminder() {
           markFiredToday();
           toast('Time to write in your diary ✍️', { icon: '⏰' });
         } else if (result === 'denied') {
-          // Permission blocked — don't spam, don't mark fired (user may unblock)
+          // Permission blocked — mark to avoid spamming every 30s; user can
+          // re-enable and it will fire again tomorrow.
+          firedRef.current = key;
           toast('Time for today\u2019s entry ✍️', { icon: '⏰' });
         }
       } catch (_) {}

@@ -34,6 +34,9 @@ router.post(
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
     const { subscription, time, tzOffset } = req.body;
+    if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
+      return res.status(500).json({ message: 'Push not configured on server (VAPID keys missing)' });
+    }
     try {
       const doc = await PushSubscription.findOneAndUpdate(
         { endpoint: subscription.endpoint },
@@ -66,6 +69,8 @@ router.put('/state', protect, async (req, res) => {
     if (time !== undefined) {
       if (!isValidTime(time)) return res.status(400).json({ message: 'Invalid time (HH:MM)' });
       update.time = time;
+      // New time today should still fire — clear today's already-fired mark
+      update.lastFiredDay = '';
     }
     if (tzOffset !== undefined && Number.isFinite(Number(tzOffset))) {
       update.tzOffset = Number(tzOffset);
