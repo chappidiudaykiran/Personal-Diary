@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, BookOpen, Search, X, Lock } from 'lucide-react';
+import { Plus, BookOpen, Search, X, Lock, Bell } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar.jsx';
 import EntryCard from '../components/EntryCard.jsx';
@@ -10,6 +10,13 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useWallpaper } from '../context/WallpaperContext.jsx';
 import { decrypt } from '../crypto/cryptoUtils.js';
 import { MOODS } from '../components/MoodPicker.jsx';
+import {
+  getReminderSettings,
+  notificationState,
+  requestNotificationPermission,
+  registerPushTimes,
+} from '../utils/reminder.js';
+import { isNative, scheduleNativeDaily } from '../utils/nativeReminder.js';
 
 function formatGreeting(date) {
   const h = date.getHours();
@@ -36,6 +43,49 @@ export default function Dashboard() {
   const [search, setSearch] = useState('');
   const [moodFilter, setMoodFilter] = useState('');
   const [showPinPrompt, setShowPinPrompt] = useState(false);
+  // One-tap reminder allow prompt — reminders are ON by default for new
+  // installs, but the phone needs one tap on Allow (OS rule).
+  const [remBanner, setRemBanner] = useState(() => {
+    try {
+      const s = getReminderSettings();
+      return s.enabled && notificationState() === 'default';
+    } catch (_) {
+      return false;
+    }
+  });
+  const [remBusy, setRemBusy] = useState(false);
+
+  const handleAllowReminders = async () => {
+    if (remBusy) return;
+    setRemBusy(true);
+    try {
+      const settings = getReminderSettings();
+      if (isNative()) {
+        const ok = await scheduleNativeDaily(settings.times);
+        if (ok) {
+          toast.success('Reminders on ✅');
+          setRemBanner(false);
+        } else {
+          toast.error('Notifications are blocked. Allow them in phone Settings > Apps > Diary.');
+        }
+        return;
+      }
+      const p = await requestNotificationPermission();
+      if (p !== 'granted') {
+        toast.error('Please allow notifications to get reminders');
+        setRemBanner(false);
+        return;
+      }
+      await registerPushTimes(settings.times);
+      toast.success('Reminders on ✅');
+      setRemBanner(false);
+    } catch (err) {
+      console.error('Enable reminders failed:', err);
+      toast.error("Couldn't turn on reminders. Try again from Account.");
+    } finally {
+      setRemBusy(false);
+    }
+  };
 
   // ─── Pull-down from top to lock ────────────────────────────────────────────
   // Drag from the very top towards the bottom and release to lock the diary.
@@ -271,6 +321,36 @@ export default function Dashboard() {
             </Link>
           </div>
         </div>
+
+        {/* Reminder allow prompt — reminders ship ON, one tap completes it */}
+        {remBanner && (
+          <div
+            className="flex items-center gap-3 rounded-2xl px-4 py-3 mb-6 fade-up"
+            style={{ background: 'var(--gold-glow)', border: '1px solid var(--border-bright)' }}
+          >
+            <Bell className="w-5 h-5 flex-shrink-0" style={{ color: 'var(--gold)' }} />
+            <p className="flex-1 text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+              Daily reminders are on — tap Allow so your diary can nudge you at 11 PM.
+            </p>
+            <button
+              type="button"
+              onClick={handleAllowReminders}
+              disabled={remBusy}
+              className="px-3.5 py-2 rounded-xl text-xs font-semibold cursor-pointer disabled:opacity-50 flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg, #c4913a, #dba84a)', color: '#0c0c17' }}
+            >
+              {remBusy ? '…' : 'Allow'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setRemBanner(false)}
+              className="text-xs cursor-pointer flex-shrink-0"
+              style={{ color: 'var(--text-ghost)' }}
+            >
+              Later
+            </button>
+          </div>
+        )}
 
         {/* Search + Mood filter */}
         {entries.length > 0 && (

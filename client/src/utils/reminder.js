@@ -35,7 +35,9 @@ export function normalizeTimes(list) {
 }
 
 export function getReminderSettings() {
-  const fallback = { enabled: false, times: ['23:00'], fired: {} };
+  // New installs start with reminders ON — the phone still needs one tap
+  // on "Allow" (OS rule), asked via an in-app banner.
+  const fallback = { enabled: true, times: ['23:00'], fired: {} };
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return fallback;
@@ -211,6 +213,20 @@ export async function getPushSubscription() {
   } catch (_) {
     return null;
   }
+}
+
+/** Subscribe this device and register its times with the server. */
+export async function registerPushTimes(times) {
+  const { default: apiClient } = await import('../api/apiClient.js');
+  const sub = await subscribeDevicePush();
+  const list = normalizeTimes(times);
+  await apiClient.post('/push/subscribe', {
+    subscription: sub.toJSON(),
+    times: list,
+    time: list[0] || '23:00',
+    tzOffset: new Date().getTimezoneOffset(),
+  });
+  return list;
 }
 
 /** Subscribe this device for server-sent reminders. Returns the subscription or null. */
