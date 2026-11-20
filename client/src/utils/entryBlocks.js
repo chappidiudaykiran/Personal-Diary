@@ -81,13 +81,18 @@ export function parseEntryContent(plaintext) {
   return [createTextBlock(plaintext)];
 }
 
-/** Serialize blocks for encryption. Whitespace-only text blocks are dropped. */
+/** Serialize blocks for encryption. Whitespace-only text blocks are dropped.
+ *  Adjacent text blocks are joined with a newline so lines typed in separate
+ *  boxes don't merge into one when the entry is viewed. */
 export function serializeBlocks(blocks) {
   const out = [];
   for (const block of blocks || []) {
     if (block.type === 'text') {
       const v = (block.text || '').trim();
-      if (v) out.push({ t: 'text', v });
+      if (!v) continue;
+      const prev = out[out.length - 1];
+      if (prev && prev.t === 'text') prev.v += `\n${v}`;
+      else out.push({ t: 'text', v });
     } else if (block.type === 'media') {
       const id = block.mediaId || block.tempId;
       if (id) {

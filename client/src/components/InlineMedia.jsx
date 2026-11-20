@@ -107,7 +107,11 @@ export default function EntryContent({ blocks, cryptoKey, metas = null }) {
   for (let i = 0; i < (blocks || []).length; i++) {
     const block = blocks[i];
     if (block.type === 'text') {
-      if (block.text?.trim()) flow.push(<span key={block.key}>{block.text}</span>);
+      // Separate boxes stay on separate lines (joined with newline)
+      if (block.text?.trim()) {
+        if (flow.length > 0) flow.push('\n');
+        flow.push(<span key={block.key}>{block.text}</span>);
+      }
     } else if (block.type === 'media' && block.mediaId) {
       const width = clampAsideWidth(block.width);
       // Text that was before media stays above (already in flow flushed as separate paragraph)
