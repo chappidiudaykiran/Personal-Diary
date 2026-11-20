@@ -23,6 +23,12 @@ import {
   unsubscribeDevicePush,
   getPushSubscription,
 } from '../utils/reminder.js';
+import {
+  isNative,
+  scheduleNativeDaily,
+  cancelNativeDaily,
+  previewNative,
+} from '../utils/nativeReminder.js';
 import { friendlyServerError } from '../utils/friendlyError.js';
 
 function formatTime12(hhmm) {
@@ -90,6 +96,17 @@ export default function Account() {
 
   useEffect(() => {
     setPerm(notificationState());
+    // Native APK: re-apply the OS schedule on every launch (survives reboot/update)
+    if (isNative()) {
+      const settings = getReminderSettings();
+      if (settings.enabled) {
+        scheduleNativeDaily(settings.time).then((ok) => {
+          setPhonePush(ok ? 'on' : 'off');
+        }).catch(() => setPhonePush('off'));
+      } else {
+        setPhonePush('off');
+      }
+    } else {
     // Auto-connect by default: if the reminder is ON but this phone was never
     // registered (stale ON state), register it silently — no extra button.
     getPushSubscription().then(async (sub) => {
@@ -120,6 +137,7 @@ export default function Account() {
         }
       }
     }).catch(() => setPhonePush('unknown'));
+    }
     // Refresh profile (createdAt) + entry count + server-registered phones
     (async () => {
       try {
@@ -150,6 +168,35 @@ export default function Account() {
 
   const handleToggleReminder = async () => {
     if (pushBusy) return;
+    // ── Native APK path: OS-level daily notification (no web push in WebView)
+    if (isNative()) {
+      if (!reminder.enabled) {
+        setPushBusy(true);
+        try {
+          const ok = await scheduleNativeDaily(reminder.time);
+          if (!ok) throw new Error('native schedule failed');
+          setPhonePush('on');
+          persistReminder({ enabled: true });
+          toast.success(`Daily reminder set for ${formatTime12(reminder.time)} ✅`);
+        } catch (err) {
+          console.error('Native reminder failed:', err);
+          toast.error("Couldn't turn on reminders on this phone. Please try again.");
+        } finally {
+          setPushBusy(false);
+        }
+      } else {
+        setPushBusy(true);
+        try {
+          await cancelNativeDaily();
+        } catch (_) {} finally {
+          setPushBusy(false);
+        }
+        setPhonePush('off');
+        persistReminder({ enabled: false });
+        toast.success('Daily reminder turned off');
+      }
+      return;
+    }
     if (!reminder.enabled) {
       // Enabling — need permission first, then register this phone with the server
       let p = notificationState();
@@ -200,6 +247,16 @@ export default function Account() {
   const handleTimeChange = async (time) => {
     const next = time || '21:00';
     persistReminder({ time: next });
+    if (isNative()) {
+      if (reminder.enabled) {
+        try {
+          await scheduleNativeDaily(next);
+        } catch (_) {
+          toast.error("Couldn't update reminder time. Try again.");
+        }
+      }
+      return;
+    }
     if (reminder.enabled) {
       try {
         // If this phone was never registered (stale ON state), register it now
@@ -216,6 +273,16 @@ export default function Account() {
   };
 
   const handleRemoveDevice = async () => {
+    if (isNative()) {
+      try {
+        await cancelNativeDaily();
+        setPhonePush('off');
+        toast.success('Reminders turned off for this phone');
+      } catch (_) {
+        toast.error("Couldn't remove reminders from this phone");
+      }
+      return;
+    }
     try {
       const sub = await getPushSubscription();
       await apiClient.delete('/push/unsubscribe', { data: { endpoint: sub?.endpoint } });
@@ -230,6 +297,14 @@ export default function Account() {
   const handleTestReminder = async () => {
     setTesting(true);
     try {
+      if (isNative()) {
+        const ok = await previewNative();
+        toast.success(ok ? "Here is what your reminder will look like 🔔" : "Reminder preview coming in a few seconds 🔔");
+        try {
+          await fireReminderNotification();
+        } catch (_) {}
+        return;
+      }
       const p = notificationState();
       setPerm(p);
       if (p !== 'granted') {
