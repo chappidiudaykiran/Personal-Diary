@@ -24,6 +24,13 @@ import {
   getPushSubscription,
 } from '../utils/reminder.js';
 
+function formatTime12(hhmm) {
+  const [h, m] = (hhmm || '21:00').split(':').map(Number);
+  const period = (h || 0) >= 12 ? 'PM' : 'AM';
+  const hour12 = (h || 0) % 12 === 0 ? 12 : ((h || 0) % 12);
+  return `${hour12}:${String(m || 0).padStart(2, '0')} ${period}`;
+}
+
 function Card({ icon: Icon, title, subtitle, children }) {
   return (
     <section
@@ -302,7 +309,7 @@ export default function Account() {
               label="Remind me every day"
               hint={
                 reminder.enabled
-                  ? `Fires once a day after ${reminder.time} · phone push ${phonePush === 'on' ? 'connected ✅' : phonePush === 'off' ? 'not connected' : '…'}` 
+                  ? `Fires once a day at ${formatTime12(reminder.time)} · phone push ${phonePush === 'on' ? 'connected ✅' : phonePush === 'off' ? 'not connected' : '…'}` 
                   : 'Off'
               }
               right={
@@ -323,7 +330,9 @@ export default function Account() {
             />
             <div className="flex items-center gap-2 py-2.5">
               <div className="flex-1">
-                <p className="text-sm" style={{ color: 'var(--text-primary)' }}>Reminder time</p>
+                <p className="text-sm" style={{ color: 'var(--text-primary)' }}>
+                  Reminder time · <span style={{ color: 'var(--gold)', fontWeight: 600 }}>{formatTime12(reminder.time)}</span>
+                </p>
                 <p className="text-[11px]" style={{ color: 'var(--text-ghost)' }}>
                   {perm === 'unsupported' ? 'Not supported in this browser' : perm === 'denied' ? 'Blocked — enable in browser site settings' : perm === 'granted' ? 'Notifications allowed' : 'Permission will be asked when you enable'}
                 </p>
