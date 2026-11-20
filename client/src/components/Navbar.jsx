@@ -38,6 +38,9 @@ export default function Navbar() {
         style={{
           background: 'var(--nav-bg)',
           borderBottom: '1px solid var(--border-color)',
+          // Capacitor draws under the phone status bar (edge-to-edge) —
+          // push the bar below it so icons/title never merge with system icons.
+          paddingTop: 'env(safe-area-inset-top)',
         }}
       >
         <div className="max-w-5xl mx-auto px-3 sm:px-6 h-14 flex items-center justify-between gap-2">

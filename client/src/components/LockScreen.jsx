@@ -62,7 +62,10 @@ export default function LockScreen() {
       style={{ background: 'var(--bg-app)' }}
     >
       {/* Top bar with theme toggle & switch account */}
-      <div className="w-full max-w-sm flex items-center justify-between pt-2">
+      <div
+        className="w-full max-w-sm flex items-center justify-between"
+        style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top))' }}
+      >
         <div className="flex items-center gap-2">
           <div
             className="w-7 h-7 rounded-lg flex items-center justify-center"

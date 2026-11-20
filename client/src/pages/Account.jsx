@@ -28,6 +28,7 @@ import {
   scheduleNativeDaily,
   cancelNativeDaily,
   previewNative,
+  getNativePermission,
 } from '../utils/nativeReminder.js';
 import { friendlyServerError } from '../utils/friendlyError.js';
 
@@ -93,15 +94,19 @@ export default function Account() {
   const [testing, setTesting] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
   const [phonePush, setPhonePush] = useState('unknown'); // on | off | unsupported | unknown
+  const [nativePerm, setNativePerm] = useState('unknown'); // native OS permission
+  const nativeApp = isNative();
 
   useEffect(() => {
     setPerm(notificationState());
     // Native APK: re-apply the OS schedule on every launch (survives reboot/update)
     if (isNative()) {
+      getNativePermission().then(setNativePerm).catch(() => {});
       const settings = getReminderSettings();
       if (settings.enabled) {
         scheduleNativeDaily(settings.time).then((ok) => {
           setPhonePush(ok ? 'on' : 'off');
+          getNativePermission().then(setNativePerm).catch(() => {});
         }).catch(() => setPhonePush('off'));
       } else {
         setPhonePush('off');
@@ -177,9 +182,11 @@ export default function Account() {
           if (!ok) {
             toast.error('Notifications are blocked. Allow them in phone Settings > Apps > Diary, then try again.');
             setPhonePush('off');
+            setNativePerm('denied');
             return;
           }
           setPhonePush('on');
+          setNativePerm('granted');
           persistReminder({ enabled: true });
           toast.success(`Daily reminder set for ${formatTime12(reminder.time)} ✅`);
         } catch (err) {
@@ -465,7 +472,9 @@ export default function Account() {
                   Reminder time · <span style={{ color: 'var(--gold)', fontWeight: 600 }}>{formatTime12(reminder.time)}</span>
                 </p>
                 <p className="text-[11px]" style={{ color: 'var(--text-ghost)' }}>
-                  {perm === 'unsupported' ? "Can't show reminders here" : perm === 'denied' ? 'Blocked — turn on reminders in your browser settings' : perm === 'granted' ? 'Reminders allowed' : "We'll ask for permission when you turn it on"}
+                  {nativeApp
+                    ? (nativePerm === 'granted' ? 'Reminders allowed on this phone' : nativePerm === 'denied' ? 'Blocked — allow in phone Settings > Apps > Diary' : "We'll ask for permission when you turn it on")
+                    : (perm === 'unsupported' ? "Can't show reminders here" : perm === 'denied' ? 'Blocked — turn on reminders in your browser settings' : perm === 'granted' ? 'Reminders allowed' : "We'll ask for permission when you turn it on")}
                 </p>
               </div>
               <input

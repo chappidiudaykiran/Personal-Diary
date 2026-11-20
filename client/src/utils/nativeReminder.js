@@ -51,6 +51,18 @@ export async function ensureNativePermission() {
   }
 }
 
+/** Current OS permission without prompting: 'granted' | 'denied' | 'unknown'. */
+export async function getNativePermission() {
+  const api = await ln();
+  if (!api) return 'unknown';
+  try {
+    const cur = await api.checkPermissions().catch(() => null);
+    return cur?.display === 'granted' ? 'granted' : cur?.display === 'denied' ? 'denied' : 'unknown';
+  } catch (_) {
+    return 'unknown';
+  }
+}
+
 /** Schedule (or reschedule) the daily native notification. */
 export async function scheduleNativeDaily(time) {
   const api = await ln();
