@@ -8,6 +8,11 @@ function formatDate(date) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+function formatTime(date) {
+  const d = date instanceof Date ? date : new Date(date);
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
 function formatDay(date) {
   const d = date instanceof Date ? date : new Date(date);
   return d.toLocaleDateString('en-US', { weekday: 'short' });
@@ -96,7 +101,7 @@ export default function EntryCard({ entry, decryptedTitle, isDecrypting }) {
                 {entry.mediaCount}
               </span>
             )}
-            <span>{formatDate(dateObj)}</span>
+            <span>{formatDate(dateObj)} · {formatTime(dateObj)}</span>
           </div>
         </div>
       </article>
