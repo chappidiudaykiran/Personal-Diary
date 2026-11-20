@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import apiClient from '../api/apiClient';
+import { clearMediaCache } from '../api/mediaApi.js';
 import { deriveKey, encryptWithPin, decryptWithPin } from '../crypto/cryptoUtils';
 
 const AuthContext = createContext(null);
@@ -134,6 +135,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
       localStorage.removeItem('diary_pin_vault');
+      clearMediaCache();
       setUser(null);
       setCryptoKey(null);
       setIsLocked(false);

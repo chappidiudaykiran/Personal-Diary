@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Download, FileAudio, FileText, Loader2 } from 'lucide-react';
 import {
   getMediaMeta,
@@ -21,7 +21,10 @@ export function InlineMedia({ cryptoKey, mediaId, layout = 'aside', width = 38, 
   const [media, setMedia] = useState(null);
   const [error, setError] = useState('');
   const [downloading, setDownloading] = useState(false);
-  const urlRef = useRef(null);
+  // NOTE: blob URLs come from the shared mediaApi blobCache (one URL per
+  // mediaId for the whole session). This component must NOT revoke them —
+  // revoking a shared URL breaks every other viewer of the same image
+  // (the cache would keep handing out the dead URL).
 
   useEffect(() => {
     let cancelled = false;
@@ -33,13 +36,13 @@ export function InlineMedia({ cryptoKey, mediaId, layout = 'aside', width = 38, 
         if (cancelled) return; setMedia(withMeta);
         if (withMeta.kind === 'image' || withMeta.kind === 'video' || withMeta.kind === 'audio') {
           const full = await fetchDecryptedMedia(cryptoKey, withMeta);
-          if (cancelled) { URL.revokeObjectURL(full.url); return; }
-          urlRef.current = full.url; setMedia(full);
+          if (cancelled) return;
+          setMedia(full);
         }
       } catch { if (!cancelled) setError('Attachment unavailable'); }
     };
     if (cryptoKey && mediaId) load();
-    return () => { cancelled = true; if (urlRef.current) URL.revokeObjectURL(urlRef.current); urlRef.current = null; };
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cryptoKey, mediaId, meta]);
 
@@ -48,7 +51,7 @@ export function InlineMedia({ cryptoKey, mediaId, layout = 'aside', width = 38, 
     try {
       setDownloading(true);
       const full = media.url ? media : await fetchDecryptedMedia(cryptoKey, media);
-      if (!media.url) { urlRef.current = full.url; setMedia(full); }
+      if (!media.url) setMedia(full);
       downloadObjectUrl(full.url, full.name);
     } catch { setError('Could not decrypt this file'); } finally { setDownloading(false); }
   };

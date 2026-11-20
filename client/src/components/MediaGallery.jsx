@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   X,
   Trash2,
@@ -17,6 +17,7 @@ import {
   decryptMediaMeta,
   fetchDecryptedMedia,
   deleteMedia,
+  clearMediaCache,
   downloadObjectUrl,
   formatFileSize,
 } from '../api/mediaApi.js';
@@ -32,31 +33,10 @@ export default function MediaGallery({ entryId, cryptoKey, editable = false, ref
   const [loading, setLoading] = useState(true);
   const [lightbox, setLightbox] = useState(-1);
   const [deletingId, setDeletingId] = useState(null);
-  const urlsRef = useRef(new Set());
+  // NOTE: blob URLs are owned by the shared mediaApi blobCache. Never revoke
+  // them here — revoking a shared URL breaks the entry viewer too.
 
-  const trackUrl = useCallback((url) => {
-    if (url) urlsRef.current.add(url);
-    return url;
-  }, []);
-
-  const revokeUrl = useCallback((url) => {
-    if (url && urlsRef.current.has(url)) {
-      URL.revokeObjectURL(url);
-      urlsRef.current.delete(url);
-    }
-  }, []);
-
-  // Revoke every Blob URL when leaving the entry
-  useEffect(() => {
-    const urls = urlsRef.current;
-    return () => {
-      urls.forEach((u) => URL.revokeObjectURL(u));
-      urls.clear();
-    };
-  }, []);
-
-  const load = useCallback(async () => {
-    if (!entryId || !cryptoKey) {
+  const load = useCallback(async () => {    if (!entryId || !cryptoKey) {
       setLoading(false);
       return;
     }
@@ -74,7 +54,6 @@ export default function MediaGallery({ entryId, cryptoKey, editable = false, ref
           .map(async (m) => {
             try {
               const full = await fetchDecryptedMedia(cryptoKey, m);
-              trackUrl(full.url);
               setItems((prev) => prev.map((it) => (it._id === m._id ? { ...it, url: full.url } : it)));
             } catch {
               setItems((prev) =>
@@ -88,7 +67,7 @@ export default function MediaGallery({ entryId, cryptoKey, editable = false, ref
     } finally {
       setLoading(false);
     }
-  }, [entryId, cryptoKey, trackUrl]);
+  }, [entryId, cryptoKey]);
 
   useEffect(() => {
     load();
@@ -98,12 +77,11 @@ export default function MediaGallery({ entryId, cryptoKey, editable = false, ref
     async (item) => {
       if (item.url) return item;
       const full = await fetchDecryptedMedia(cryptoKey, item);
-      trackUrl(full.url);
       const updated = { ...item, url: full.url };
       setItems((prev) => prev.map((it) => (it._id === item._id ? updated : it)));
       return updated;
     },
-    [cryptoKey, trackUrl]
+    [cryptoKey]
   );
 
   const handleDownload = async (item) => {
@@ -119,7 +97,8 @@ export default function MediaGallery({ entryId, cryptoKey, editable = false, ref
     setDeletingId(item._id);
     try {
       await deleteMedia(item._id);
-      revokeUrl(item.url);
+      // Media is gone on the server too, so dropping its cached URL is safe.
+      clearMediaCache(item._id);
       setItems((prev) => {
         const next = prev.filter((it) => it._id !== item._id);
         onCountChange?.(next.length);
