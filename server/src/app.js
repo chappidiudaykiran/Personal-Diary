@@ -8,6 +8,7 @@ const authRoutes = require('./routes/auth');
 const entryRoutes = require('./routes/entries');
 const mediaRoutes = require('./routes/media');
 const pushRoutes = require('./routes/push');
+const { isDbConnected } = require('./config/db');
 
 const app = express();
 
@@ -76,9 +77,14 @@ app.use('/api/entries', entryRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/push', pushRoutes);
 
-// Health check
+// Health check — always 200 so the host and keep-alive pings don't flap;
+// `db` reports whether Mongo is reachable right now.
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  let db = 'down';
+  try {
+    db = isDbConnected() ? 'up' : 'down';
+  } catch (_) {}
+  res.json({ status: 'ok', db, timestamp: new Date().toISOString() });
 });
 
 // ─── 404 handler ──────────────────────────────────────────────────────────────
