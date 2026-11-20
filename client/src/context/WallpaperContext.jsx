@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast';
+import { useTheme } from './ThemeContext.jsx';
 import {
   saveCustomWallpaper,
   loadCustomWallpaper,
@@ -96,6 +97,15 @@ export function WallpaperProvider({ children }) {
   const [stored, setStored] = useState(readStored);
   const wallpaper = stored.id;
   const [customUrl, setCustomUrl] = useState(null);
+  // Theme decides the scrim color (light theme = light wash, dark = dark wash),
+  // so text on the wallpaper must follow the theme — not the image brightness.
+  // Otherwise a "dark" photo + light theme gives white text on a white wash.
+  let isDark = true;
+  try {
+    isDark = useTheme().isDark;
+  } catch (_) {
+    isDark = !document.documentElement.classList.contains('light');
+  }
 
   // Load custom image blob into an object URL on mount (and when selected)
   useEffect(() => {
@@ -136,8 +146,12 @@ export function WallpaperProvider({ children }) {
   }, []);
 
   // Wallpaper tone drives top-text contrast. null = no wallpaper (follow theme).
+  // NOTE: the scrim follows the theme (light theme = light wash), so in light
+  // mode the backdrop is always light regardless of image brightness — text
+  // must be dark. Only in dark mode do we respect the analyzed image tone.
   const preset = PRESET_WALLPAPERS.find((p) => p.id === wallpaper);
-  const tone = wallpaper === 'none' ? null : wallpaper === 'custom' ? stored.customTone : preset?.tone || 'dark';
+  const rawTone = wallpaper === 'none' ? null : wallpaper === 'custom' ? stored.customTone : preset?.tone || 'dark';
+  const tone = !rawTone ? null : isDark ? rawTone : 'light';
   // Ink colors for text sitting directly on the wallpaper.
   // NOTE: muted values stay fairly opaque so small navbar icons keep
   // enough contrast on bright wallpapers / light theme.

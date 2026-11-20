@@ -73,7 +73,7 @@ html.light {
   --scrollbar-track: #faf7f2;
   --skeleton-bg: linear-gradient(90deg, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0.08) 50%, rgba(0,0,0,0.04) 100%);
 
-  --wallpaper-scrim: rgba(250, 247, 242, 0.86);
+  --wallpaper-scrim: rgba(250, 247, 242, 0.92);
   --nav-hover: rgba(35, 32, 28, 0.07);
 }
 
