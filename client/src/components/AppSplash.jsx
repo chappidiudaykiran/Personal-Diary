@@ -58,6 +58,14 @@ export default function AppSplash() {
       `${name}, ninna gurinchi, repu gurinchi, anni ikkade 🕰️`,
       `${name}, chadavadam kaadu, raayadam important ✍️`,
       `${name}, life lo anni twists ikkade untai 🌀`,
+      `${name}, aalochana vaste ventane raasi pettu 💡`,
+      `${name}, kopam vaste aksharalu tho kakku 😡`,
+      `${name}, navvukunte half tension poye 😁`,
+      `${name}, roju ni diary tho start chey ☀️`,
+      `${name}, badha padithe pen tho badhulu cheppu 💬`,
+      `${name}, santosham vaste four lines raayi 🥳`,
+      `${name}, dreams anni ink tho nimpu 🌙`,
+      `${name}, gunde bharam anni ikkade digipettu 🫶`,
     ];
     if (!name) return 'Your private space for everyday moments';
     return lines[Math.floor(Math.random() * lines.length)];
