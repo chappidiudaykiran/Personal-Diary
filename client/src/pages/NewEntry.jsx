@@ -215,6 +215,10 @@ export default function NewEntry() {
 
   const handleSave = async (e) => {
     e.preventDefault();
+    if (!cryptoKey) {
+      toast.error('Session expired — please login again to unlock encryption.');
+      return;
+    }
     if (!title.trim()) {
       toast.error('Please add a title for your entry');
       return;
@@ -267,8 +271,28 @@ export default function NewEntry() {
       try { await clearDraftBlobs(draftKey); } catch (_) {}
       navigate(`/entry/${entryId}`);
     } catch (err) {
-      toast.error('Failed to save entry. Please try again.');
-      console.error(err);
+      const status = err?.response?.status;
+      const serverMsg =
+        err?.response?.data?.message || err?.response?.data?.errors?.[0]?.msg;
+      console.error('Save entry failed:', {
+        status,
+        data: err?.response?.data,
+        code: err?.code,
+        message: err?.message,
+      });
+      if (err?.code === 'ECONNABORTED') {
+        toast.error('Server is waking up (cold start). Wait ~30s and try again.');
+      } else if (status === 401) {
+        toast.error('Session expired. Please login again.');
+      } else if (status === 413) {
+        toast.error('Entry too large. Remove some images or shorten text.');
+      } else if (serverMsg) {
+        toast.error(serverMsg);
+      } else if (!err?.response) {
+        toast.error('Cannot reach server. Check connection / backend status.');
+      } else {
+        toast.error('Failed to save entry. Please try again.');
+      }
     } finally {
       setSaving(false);
       setUploadStatus('');

@@ -152,6 +152,10 @@ export default function ViewEntry() {
 
   // ─── Save edited entry ─────────────────────────────────────────────────────
   const handleSave = async () => {
+    if (!cryptoKey) {
+      toast.error('Session expired — please login again to unlock encryption.');
+      return;
+    }
     if (!title.trim()) {
       toast.error('Title cannot be empty');
       return;
@@ -211,8 +215,28 @@ export default function ViewEntry() {
       } else {
         toast.success('Entry updated ✨');
       }
-    } catch {
-      toast.error('Failed to update entry');
+    } catch (err) {
+      const status = err?.response?.status;
+      const serverMsg =
+        err?.response?.data?.message || err?.response?.data?.errors?.[0]?.msg;
+      console.error('Update entry failed:', {
+        status,
+        data: err?.response?.data,
+        code: err?.code,
+      });
+      if (err?.code === 'ECONNABORTED') {
+        toast.error('Server is waking up (cold start). Wait ~30s and try again.');
+      } else if (status === 401) {
+        toast.error('Session expired. Please login again.');
+      } else if (status === 413) {
+        toast.error('Entry too large. Remove some images or shorten text.');
+      } else if (serverMsg) {
+        toast.error(serverMsg);
+      } else if (!err?.response) {
+        toast.error('Cannot reach server. Check connection / backend status.');
+      } else {
+        toast.error('Failed to update entry');
+      }
     } finally {
       setSaving(false);
       setUploadStatus('');

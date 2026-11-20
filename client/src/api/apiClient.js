@@ -5,8 +5,8 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 const apiClient = axios.create({
   baseURL: API_BASE,
   headers: { 'Content-Type': 'application/json' },
-  // Fail fast on mobile data/offline so the UI falls back to cache instead of hanging
-  timeout: 10000,
+  // Render free tier cold-starts can take 30-60s — fail fast only for cached reads
+  timeout: 30000,
 });
 
 // ─── Request interceptor: attach access token ─────────────────────────────────
@@ -77,6 +77,23 @@ apiClient.interceptors.response.use(
       } finally {
         isRefreshing = false;
       }
+    }
+
+    // ─── Cold-start retry: Render free tier sleeps after idle ─────────────────
+    // First request can timeout (ECONNABORTED) or return 502/503/504 while waking.
+    // Retry once with a longer timeout instead of failing the save.
+    const retriable =
+      !originalRequest._coldRetry &&
+      (error.code === 'ECONNABORTED' ||
+        !error.response ||
+        [502, 503, 504].includes(error.response?.status));
+
+    if (retriable && originalRequest.url !== '/auth/refresh') {
+      originalRequest._coldRetry = true;
+      originalRequest.timeout = 60000;
+      // Give the server a moment to finish waking before retrying
+      await new Promise((r) => setTimeout(r, 2000));
+      return apiClient(originalRequest);
     }
 
     return Promise.reject(error);

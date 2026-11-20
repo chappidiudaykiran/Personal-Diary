@@ -1,0 +1,26 @@
+name: keep-backend-alive
+
+# Pings the Render backend every 10 minutes so the free tier doesn't sleep.
+# Render sleeps after ~15 min idle; traffic every 10 min keeps it warm.
+# Manual runs: Actions tab -> keep-backend-alive -> Run workflow.
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping backend health
+        run: |
+          for i in 1 2 3; do
+            if curl -fsS --max-time 60 https://diary-backend-orc0.onrender.com/api/health; then
+              echo "Backend is awake"
+              exit 0
+            fi
+            echo "Attempt $i failed, retrying in 20s..."
+            sleep 20
+          done
+          echo "Backend did not respond after 3 attempts"
+          exit 1

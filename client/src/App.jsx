@@ -1,8 +1,9 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext.jsx';
 import LockScreen from './components/LockScreen.jsx';
 import SetPinModal from './components/SetPinModal.jsx';
+import apiClient from './api/apiClient.js';
 
 // Code-split routes so first load is small and repeat loads come from SW cache
 const Login = lazy(() => import('./pages/Login.jsx'));
@@ -52,6 +53,12 @@ const PublicRoute = ({ children }) => {
 
 export default function App() {
   const { showPinSetup, setShowPinSetup } = useAuth();
+
+  // Warm up the Render backend on app load so the first save doesn't
+  // hit a cold-start. Fire-and-forget — failures are handled per-request.
+  useEffect(() => {
+    apiClient.get('/health').catch(() => {});
+  }, []);
 
   return (
     <>

@@ -69,6 +69,8 @@ export async function uploadMediaFile(cryptoKey, entryId, file) {
 
   const { data } = await apiClient.post(`/media/entries/${entryId}`, form, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    // Encrypted uploads (up to 10 MB) need longer than the default timeout
+    timeout: 120000,
   });
   return data.media;
 }
