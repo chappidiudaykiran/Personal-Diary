@@ -277,3 +277,35 @@ button.rounded-full:active {
     display: none;
   }
 }
+
+/* ---------- Top toast: wallpaper-matched, borderless, erase-out exit ---------- */
+.diary-toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+}
+
+/* Dismiss wipes the text right-to-left like it's being erased, then fades */
+.diary-toast-erase {
+  animation: toast-erase 0.32s ease-in forwards;
+}
+
+@keyframes toast-erase {
+  from {
+    clip-path: inset(-4px -4px -4px -4px);
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    clip-path: inset(-4px 100% -4px -4px);
+    opacity: 0;
+    transform: translateX(10px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .diary-toast-erase {
+    animation: none;
+  }
+}
