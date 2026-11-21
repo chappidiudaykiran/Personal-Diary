@@ -46,67 +46,85 @@ const WALLPAPER_ACCENTS = {
 };
 const GOLD_ACCENT = { bg: 'linear-gradient(135deg, #c4913a, #dba84a)', fg: '#0c0c17' };
 
+/** Typewriter erase: while visible shows full text + blinking caret;
+ *  on dismiss deletes characters one-by-one from the end. */
+function EraseText({ text, visible, color, shadow }) {
+  const [len, setLen] = useState(null); // null = full text
+  useEffect(() => {
+    if (visible) {
+      setLen(null);
+      return;
+    }
+    const full = text.length;
+    if (full === 0) return;
+    // Erase takes ~0.6s regardless of length (fits inside removeDelay)
+    const step = Math.max(6, Math.min(24, Math.floor(600 / full)));
+    setLen(full);
+    const id = setInterval(() => {
+      setLen((l) => {
+        if (l === null || l <= 1) {
+          clearInterval(id);
+          return 0;
+        }
+        return l - 1;
+      });
+    }, step);
+    return () => clearInterval(id);
+  }, [visible, text]);
+
+  const shown = len === null ? text : text.slice(0, len);
+  return (
+    <span className="diary-toast-text" style={{ color, textShadow: shadow }}>
+      {shown}
+      <span className={visible ? 'diary-caret diary-caret-blink' : 'diary-caret'} />
+    </span>
+  );
+}
+
 function ThemedToaster() {
   const { isDark } = useTheme();
-  const { wallpaper } = useWallpaper();
-  const accent = WALLPAPER_ACCENTS[wallpaper] || GOLD_ACCENT;
+  const { topGold } = useWallpaper();
+  const successColor = topGold || 'var(--gold)';
+  const errorColor = isDark ? '#f09696' : '#b3261e';
+  const shadow = isDark ? '0 1px 10px rgba(0,0,0,0.65)' : '0 1px 6px rgba(255,255,255,0.7)';
+  // Text-only toast: no background, no border, no shadow box
+  const naked = {
+    background: 'transparent',
+    border: 'none',
+    boxShadow: 'none',
+    padding: '6px 10px',
+  };
   return (
     <Toaster
       position="top-center"
+      gutter={8}
+      // Sit below the navbar instead of glued to the very top edge
+      containerStyle={{ top: 76, left: 16, right: 16 }}
       toastOptions={{
         duration: 3000,
-        // Keep the toast mounted briefly after dismiss so the erase-out
-        // animation (see index.css `.diary-toast-erase`) can play fully.
-        removeDelay: 450,
-        style: isDark
-          ? {
-              background: '#181828',
-              color: '#ede8d8',
-              border: 'none',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-            }
-          : {
-              background: '#ffffff',
-              color: '#1f1b18',
-              border: 'none',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.08)',
-            },
-        success: {
-          style: {
-            background: accent.bg,
-            color: accent.fg,
-            border: 'none',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
-            fontWeight: 600,
-          },
-          iconTheme: { primary: accent.fg, secondary: 'rgba(255,255,255,0.35)' },
-        },
-        error: {
-          style: isDark
-            ? {
-                background: '#2a1418',
-                color: '#f3b8b8',
-                border: 'none',
-                boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-              }
-            : {
-                background: '#fdecea',
-                color: '#8f1d1d',
-                border: 'none',
-                boxShadow: '0 8px 24px rgba(0,0,0,0.08)',
-              },
-          iconTheme: { primary: '#e05555', secondary: 'rgba(255,255,255,0.35)' },
-        },
+        // Keep the toast mounted so the character erase can finish
+        removeDelay: 1000,
+        style: { ...naked, color: isDark ? '#ede8d8' : '#1f1b18', fontWeight: 600 },
+        success: { style: { ...naked } },
+        error: { style: { ...naked } },
       }}
     >
       {(t) => (
         <ToastBar toast={t} position={t.position}>
-          {({ icon, message }) => (
-            <div className={t.visible ? 'diary-toast' : 'diary-toast diary-toast-erase'}>
-              {icon}
-              <span>{message}</span>
-            </div>
-          )}
+          {({ message }) => {
+            const color = t.type === 'error' ? errorColor : t.type === 'success' ? successColor : isDark ? '#ede8d8' : '#1f1b18';
+            return (
+              <div className="diary-toast">
+                {typeof message === 'string' ? (
+                  <EraseText text={message} visible={t.visible} color={color} shadow={shadow} />
+                ) : (
+                  <span className="diary-toast-text" style={{ color, textShadow: shadow }}>
+                    {message}
+                  </span>
+                )}
+              </div>
+            );
+          }}
         </ToastBar>
       )}
     </Toaster>

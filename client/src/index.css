@@ -278,34 +278,61 @@ button.rounded-full:active {
   }
 }
 
-/* ---------- Top toast: wallpaper-matched, borderless, erase-out exit ---------- */
+/* ---------- Top toast: text-only, typewriter erase, sits below navbar ---------- */
 .diary-toast {
   display: flex;
   align-items: center;
-  gap: 8px;
   max-width: 100%;
+  background: transparent;
 }
 
-/* Dismiss wipes the text right-to-left like it's being erased, then fades */
-.diary-toast-erase {
-  animation: toast-erase 0.32s ease-in forwards;
+.diary-toast-text {
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.4;
+  text-align: center;
+  white-space: pre-wrap;
+  word-break: break-word;
+  animation: toast-text-in 0.25s ease-out;
 }
 
-@keyframes toast-erase {
+@keyframes toast-text-in {
   from {
-    clip-path: inset(-4px -4px -4px -4px);
-    opacity: 1;
-    transform: translateX(0);
+    opacity: 0;
+    transform: translateY(-6px);
   }
   to {
-    clip-path: inset(-4px 100% -4px -4px);
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Typewriter caret */
+.diary-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 3px;
+  vertical-align: -2px;
+  background: currentColor;
+  opacity: 0.9;
+}
+
+.diary-caret-blink {
+  animation: diary-caret-blink 1s steps(2, jump-none) infinite;
+}
+
+@keyframes diary-caret-blink {
+  50% {
     opacity: 0;
-    transform: translateX(10px);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .diary-toast-erase {
+  .diary-toast-text {
+    animation: none;
+  }
+  .diary-caret-blink {
     animation: none;
   }
 }
