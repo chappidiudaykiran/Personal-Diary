@@ -5,10 +5,20 @@ buildscript {
     repositories {
         google()
         mavenCentral()
+        // Fallback mirror of Maven Central hosted on Google infrastructure.
+        // If repo.maven.apache.org is unreachable from CI, dependency
+        // resolution still succeeds instead of failing with "Could not find".
+        maven { url "https://maven-central.storage-download.googleapis.com/maven2/" }
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:8.13.0'
-        classpath 'com.google.gms:google-services:4.4.4'
+
+        // NOTE: google-services classpath intentionally omitted. Push uses
+        // web-push (no FCM) and there is no google-services.json, so the
+        // plugin is never applied — keeping the classpath would only force
+        // Gradle to resolve a large unused dependency tree on every build.
+        // Only re-add `com.google.gms:google-services` together with
+        // app/google-services.json if FCM is ever adopted.
 
         // NOTE: Do not place your application dependencies here; they belong
         // in the individual module build.gradle files
@@ -21,6 +31,8 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        // Same Central mirror fallback for app/module dependencies.
+        maven { url "https://maven-central.storage-download.googleapis.com/maven2/" }
     }
 }
 
