@@ -95,7 +95,7 @@ function ThemedToaster() {
   const accentHex = ACCENT_HEX[wallpaper] || '#c4913a';
   // Very light gradient wash tinted by type — text stays the readable part
   const naked = (tint) => ({
-    background: `linear-gradient(135deg, ${hexToRgba(tint, isDark ? 0.22 : 0.14)}, ${hexToRgba(tint, isDark ? 0.1 : 0.06)})`,
+    background: `linear-gradient(135deg, ${hexToRgba(tint, isDark ? 0.12 : 0.08)}, ${hexToRgba(tint, isDark ? 0.05 : 0.03)})`,
     border: 'none',
     borderRadius: 12,
     boxShadow: 'none',
