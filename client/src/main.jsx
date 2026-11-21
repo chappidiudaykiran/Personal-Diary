@@ -33,18 +33,23 @@ try {
   }
 } catch (_) {}
 
-// Success-toast accent follows the wallpaper (falls back to gold).
-const WALLPAPER_ACCENTS = {
-  golden: { bg: '#c4913a', fg: '#0c0c17' },
-  ocean: { bg: '#14919b', fg: '#062a30' },
-  forest: { bg: '#2d6a4f', fg: '#ffffff' },
-  rose: { bg: '#c98a94', fg: '#33101d' },
-  lavender: { bg: '#a394e0', fg: '#1e1b4b' },
-  midnight: { bg: '#4a5f9e', fg: '#ffffff' },
-  dune: { bg: '#e6ac4e', fg: '#231a08' },
-  matcha: { bg: '#7fa383', fg: '#0f1a12' },
+// Wallpaper accent as a plain hex so we can tint the toast background.
+const ACCENT_HEX = {
+  golden: '#c4913a',
+  ocean: '#14919b',
+  forest: '#2d6a4f',
+  rose: '#c98a94',
+  lavender: '#a394e0',
+  midnight: '#4a5f9e',
+  dune: '#e6ac4e',
+  matcha: '#7fa383',
 };
-const GOLD_ACCENT = { bg: 'linear-gradient(135deg, #c4913a, #dba84a)', fg: '#0c0c17' };
+
+const hexToRgba = (hex, a) => {
+  const h = (hex || '#c4913a').replace('#', '');
+  const n = parseInt(h.length === 3 ? h.split('').map((c) => c + c).join('') : h, 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+};
 
 /** Typewriter erase: while visible shows full text + blinking caret;
  *  on dismiss deletes characters one-by-one from the end. */
@@ -83,17 +88,22 @@ function EraseText({ text, visible, color, shadow }) {
 
 function ThemedToaster() {
   const { isDark } = useTheme();
-  const { topGold } = useWallpaper();
+  const { topGold, wallpaper } = useWallpaper();
   const successColor = topGold || 'var(--gold)';
   const errorColor = isDark ? '#f09696' : '#b3261e';
   const shadow = isDark ? '0 1px 10px rgba(0,0,0,0.65)' : '0 1px 6px rgba(255,255,255,0.7)';
-  // Text-only toast: no background, no border, no shadow box
-  const naked = {
-    background: 'transparent',
+  const accentHex = ACCENT_HEX[wallpaper] || '#c4913a';
+  // Very light gradient wash tinted by type — text stays the readable part
+  const naked = (tint) => ({
+    background: `linear-gradient(135deg, ${hexToRgba(tint, isDark ? 0.22 : 0.14)}, ${hexToRgba(tint, isDark ? 0.1 : 0.06)})`,
     border: 'none',
+    borderRadius: 12,
     boxShadow: 'none',
-    padding: '6px 10px',
-  };
+    padding: '8px 14px',
+    backdropFilter: 'blur(8px)',
+    WebkitBackdropFilter: 'blur(8px)',
+  });
+  const neutral = isDark ? '#ffffff' : '#000000';
   return (
     <Toaster
       position="top-center"
@@ -104,9 +114,9 @@ function ThemedToaster() {
         duration: 3000,
         // Keep the toast mounted so the character erase can finish
         removeDelay: 1000,
-        style: { ...naked, color: isDark ? '#ede8d8' : '#1f1b18', fontWeight: 600 },
-        success: { style: { ...naked } },
-        error: { style: { ...naked } },
+        style: { ...naked(neutral), color: isDark ? '#ede8d8' : '#1f1b18', fontWeight: 600 },
+        success: { style: { ...naked(accentHex) } },
+        error: { style: { ...naked('#e05555') } },
       }}
     >
       {(t) => (
