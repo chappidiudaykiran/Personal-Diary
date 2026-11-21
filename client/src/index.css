@@ -195,9 +195,9 @@ html.wallpaper-light {
   background-clip: text;
 }
 
-/* ---------- Global click / tap feedback ---------- */
+/* ---------- Global click / tap feedback (subtle) ---------- */
 
-/* Smooth press-down on every interactive element */
+/* Gentle press-down on interactive elements only */
 button,
 a,
 [role='button'],
@@ -206,13 +206,7 @@ input[type='button'],
 select,
 .pressable {
   -webkit-tap-highlight-color: transparent;
-  transition:
-    transform 0.15s cubic-bezier(0.22, 1, 0.36, 1),
-    filter 0.15s ease,
-    background-color 0.15s ease,
-    box-shadow 0.15s ease,
-    opacity 0.15s ease;
-  will-change: transform;
+  transition: transform 0.12s ease, background-color 0.15s ease, opacity 0.15s ease;
 }
 
 button:active,
@@ -221,14 +215,13 @@ a:active,
 input[type='submit']:active,
 input[type='button']:active,
 .pressable:active {
-  transform: scale(0.96);
-  filter: brightness(1.08);
+  transform: scale(0.985);
 }
 
-/* Smaller icon/chip buttons get a subtler shrink so layout never jumps */
+/* Icon/chip buttons: barely-there shrink */
 .nav-icon-btn:active,
 button.rounded-full:active {
-  transform: scale(0.92);
+  transform: scale(0.96);
 }
 
 /* Ripple layer rendered by <ClickFeedback /> */
@@ -246,23 +239,22 @@ button.rounded-full:active {
   pointer-events: none;
   background: radial-gradient(
     circle,
-    color-mix(in srgb, var(--gold) 38%, transparent) 0%,
-    color-mix(in srgb, var(--gold) 18%, transparent) 40%,
+    color-mix(in srgb, var(--gold) 16%, transparent) 0%,
+    color-mix(in srgb, var(--gold) 7%, transparent) 45%,
     transparent 70%
   );
-  border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent);
   transform: scale(0.4);
-  opacity: 0.9;
-  animation: click-ripple-expand 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  opacity: 0.35;
+  animation: click-ripple-expand 0.35s ease-out forwards;
 }
 
 @keyframes click-ripple-expand {
   from {
     transform: scale(0.4);
-    opacity: 0.9;
+    opacity: 0.35;
   }
   to {
-    transform: scale(4.2);
+    transform: scale(2.2);
     opacity: 0;
   }
 }

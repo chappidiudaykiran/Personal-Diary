@@ -23,6 +23,14 @@ export default function ClickFeedback() {
       // Ignore right-clicks / non-primary buttons
       if (e.button !== undefined && e.button !== 0) return;
 
+      // Only animate taps on interactive elements — page-background taps
+      // stay silent so the effect never feels "too much".
+      const target = e.target instanceof Element ? e.target : null;
+      const interactive = target?.closest?.(
+        'button, a, [role="button"], input[type="submit"], input[type="button"], select, .pressable'
+      );
+      if (!interactive) return;
+
       const x = e.clientX;
       const y = e.clientY;
       if (x == null || y == null) return;
@@ -30,12 +38,7 @@ export default function ClickFeedback() {
       const ripple = document.createElement('span');
       ripple.className = 'click-ripple';
 
-      // Slightly bigger ripple for clicks on interactive elements
-      const target = e.target instanceof Element ? e.target : null;
-      const isInteractive = !!target?.closest?.(
-        'button, a, [role="button"], input[type="submit"], input[type="button"], select, .pressable'
-      );
-      const size = isInteractive ? 28 : 20;
+      const size = 14;
       ripple.style.width = `${size}px`;
       ripple.style.height = `${size}px`;
       ripple.style.left = `${x - size / 2}px`;
