@@ -194,3 +194,94 @@ html.wallpaper-light {
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
+
+/* ---------- Global click / tap feedback ---------- */
+
+/* Smooth press-down on every interactive element */
+button,
+a,
+[role='button'],
+input[type='submit'],
+input[type='button'],
+select,
+.pressable {
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform 0.15s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.15s ease,
+    background-color 0.15s ease,
+    box-shadow 0.15s ease,
+    opacity 0.15s ease;
+  will-change: transform;
+}
+
+button:active,
+a:active,
+[role='button']:active,
+input[type='submit']:active,
+input[type='button']:active,
+.pressable:active {
+  transform: scale(0.96);
+  filter: brightness(1.08);
+}
+
+/* Smaller icon/chip buttons get a subtler shrink so layout never jumps */
+.nav-icon-btn:active,
+button.rounded-full:active {
+  transform: scale(0.92);
+}
+
+/* Ripple layer rendered by <ClickFeedback /> */
+.click-ripple-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.click-ripple {
+  position: fixed;
+  border-radius: 9999px;
+  pointer-events: none;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--gold) 38%, transparent) 0%,
+    color-mix(in srgb, var(--gold) 18%, transparent) 40%,
+    transparent 70%
+  );
+  border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent);
+  transform: scale(0.4);
+  opacity: 0.9;
+  animation: click-ripple-expand 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes click-ripple-expand {
+  from {
+    transform: scale(0.4);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(4.2);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button,
+  a,
+  [role='button'],
+  .pressable {
+    transition: none;
+  }
+  button:active,
+  a:active,
+  [role='button']:active,
+  .pressable:active {
+    transform: none;
+    filter: none;
+  }
+  .click-ripple-layer {
+    display: none;
+  }
+}

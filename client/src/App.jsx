@@ -4,6 +4,7 @@ import { useAuth } from './context/AuthContext.jsx';
 import LockScreen from './components/LockScreen.jsx';
 import SetPinModal from './components/SetPinModal.jsx';
 import AppSplash from './components/AppSplash.jsx';
+import ClickFeedback from './components/ClickFeedback.jsx';
 import apiClient from './api/apiClient.js';
 import { useReminder } from './hooks/useReminder.js';
 
@@ -117,6 +118,7 @@ export default function App() {
   return (
     <>
       <AppSplash />
+      <ClickFeedback />
       <RouteErrorBoundary>
       <Suspense fallback={<RouteLoader />}>
         <Routes>
