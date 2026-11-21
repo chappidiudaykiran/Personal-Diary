@@ -96,6 +96,7 @@ export default function Account() {
   const [newTime, setNewTime] = useState('23:00');
   const [perm, setPerm] = useState('default');
   const [testing, setTesting] = useState(false);
+  const [serverTesting, setServerTesting] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
   const [phonePush, setPhonePush] = useState('unknown'); // on | off | unsupported | unknown
   const [nativePerm, setNativePerm] = useState('unknown'); // native OS permission
@@ -121,6 +122,11 @@ export default function Account() {
     getPushSubscription().then(async (sub) => {
       if (sub) {
         setPhonePush('on');
+        // Keep the server's timezone offset fresh so the tick worker fires
+        // at the right local time even after travel/DST changes.
+        try {
+          await apiClient.put('/push/state', { tzOffset: new Date().getTimezoneOffset() });
+        } catch (_) {}
         // Local sub exists but server may have lost it (DB reset) — re-sync.
         try {
           const { data } = await apiClient.get('/push/status');
@@ -390,6 +396,25 @@ export default function Account() {
     }
   };
 
+  /** Server push test — proves notifications arrive with the app fully closed. */
+  const handleServerTest = async () => {
+    if (serverTesting) return;
+    setServerTesting(true);
+    try {
+      const { data } = await apiClient.post('/push/test');
+      if (data && data.sent > 0) {
+        toast.success('Server push sent — close the app fully and wait ~10s 🔔');
+      } else {
+        toast.error(data?.message || 'This phone is not registered. Turn reminders off and on again.');
+        setPhonePush('off');
+      }
+    } catch (err) {
+      toast.error(friendlyServerError(err?.response?.data?.message, "Server push failed. Check internet and try again."));
+    } finally {
+      setServerTesting(false);
+    }
+  };
+
   const handleSaveName = async () => {
     const clean = username.trim();
     if (clean.length < 3 || clean.length > 30) {
@@ -597,6 +622,18 @@ export default function Account() {
               {testing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : reminder.enabled ? <Bell className="w-3.5 h-3.5" /> : <BellOff className="w-3.5 h-3.5" />}
               {testing ? 'Sending preview…' : 'Send a preview'}
             </button>
+            {!nativeApp && (
+              <button
+                type="button"
+                onClick={handleServerTest}
+                disabled={serverTesting}
+                className="mt-1 flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-xl text-xs font-medium cursor-pointer disabled:opacity-50"
+                style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-muted)' }}
+              >
+                {serverTesting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Bell className="w-3.5 h-3.5" />}
+                {serverTesting ? 'Sending server push…' : 'Test closed-app push (via server)'}
+              </button>
+            )}
           </Card>
 
           {/* Appearance */}

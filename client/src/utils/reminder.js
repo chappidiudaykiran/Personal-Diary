@@ -241,11 +241,30 @@ export async function subscribeDevicePush() {
     throw new Error('Reminder worker is still starting. Reload the page and try again.');
   }
   const existing = await reg.pushManager.getSubscription();
-  if (existing) return existing;
-  return reg.pushManager.subscribe({
+  if (existing) {
+    // Server keys rotated at some point → old subscriptions can never receive
+    // pushes (410 Gone). Detect via the stored key and resubscribe cleanly so
+    // closed-app reminders keep working without a manual off/on toggle.
+    try {
+      const usedKey = localStorage.getItem('diary_vapid_key');
+      if (usedKey && usedKey !== vapidKey) {
+        await existing.unsubscribe().catch(() => {});
+      } else {
+        localStorage.setItem('diary_vapid_key', vapidKey);
+        return existing;
+      }
+    } catch (_) {
+      return existing;
+    }
+  }
+  const sub = await reg.pushManager.subscribe({
     userVisibleOnly: true,
     applicationServerKey: urlBase64ToUint8Array(vapidKey),
   });
+  try {
+    localStorage.setItem('diary_vapid_key', vapidKey);
+  } catch (_) {}
+  return sub;
 }
 
 export async function unsubscribeDevicePush() {

@@ -167,6 +167,45 @@ function toMinutes(hhmm) {
   return (h || 0) * 60 + (m || 0);
 }
 
+// ─── POST /api/push/test ──────────────────────────────────────────────────────
+// Sends an immediate test push to all of this user's enabled devices.
+// Proves the closed-app path works (unlike the local preview, which only
+// fires while the app is open). Returns how many pushes were accepted.
+router.post('/test', protect, async (req, res) => {
+  try {
+    if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
+      return res.status(500).json({ message: 'Push not configured on server (VAPID keys missing)' });
+    }
+    const subs = await PushSubscription.find({ userId: req.user._id, enabled: true }).populate('userId', 'username');
+    if (subs.length === 0) {
+      return res.json({ sent: 0, message: 'This phone is not registered for push. Turn reminders off and on again.' });
+    }
+    let sent = 0;
+    for (const sub of subs) {
+      try {
+        const name = sub.userId?.username || 'friend';
+        await webpush.sendNotification(
+          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+          JSON.stringify({
+            title: `Hey ${name}, test reminder 🔔`,
+            body: 'If you see this with the app closed, closed-app reminders work.',
+            url: '/dashboard',
+          })
+        );
+        sent += 1;
+      } catch (err) {
+        if (err?.statusCode === 404 || err?.statusCode === 410) {
+          await PushSubscription.deleteOne({ _id: sub._id });
+        }
+      }
+    }
+    res.json({ sent, devices: subs.length });
+  } catch (error) {
+    console.error('Push test error:', error);
+    res.status(500).json({ message: 'Failed to send test push' });
+  }
+});
+
 // ─── GET /api/push/tick?secret=… ──────────────────────────────────────────────
 // Called by the GitHub Actions cron every 5 minutes. Sends due reminders.
 // Not a user route — guarded by a shared secret, not the login token.
