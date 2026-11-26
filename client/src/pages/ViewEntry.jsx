@@ -1,9 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Pencil, Trash2, Save, X, Loader2 } from 'lucide-react';
+import { Pencil, Trash2, X, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import Navbar from '../components/Navbar.jsx';
-import MoodPicker, { moodMap } from '../components/MoodPicker.jsx';
+import { moodMap } from '../components/MoodPicker.jsx';
 import BlockEditor from '../components/BlockEditor.jsx';
 import EntryContent from '../components/InlineMedia.jsx';
 import { uploadMediaFile, listMedia, deleteMedia } from '../api/mediaApi.js';
@@ -67,17 +66,6 @@ export default function ViewEntry() {
   // Guards the background media merge below (avoids touching blocks mid-edit)
   const editingRef = useRef(false);
   editingRef.current = editing;
-
-  // ─── Back: go to where you came from, fallback to diary ───────────────────
-  // navigate(-1) alone can close the app / land on a blank page when the
-  // entry was opened directly (no history). Fall back to /dashboard then.
-  const handleBack = () => {
-    if (window.history.length > 1) {
-      navigate(-1);
-    } else {
-      navigate('/dashboard');
-    }
-  };
 
   // ─── Load & decrypt entry ──────────────────────────────────────────────────
   // Two phases: paint title + text immediately after decrypt, then fill in
@@ -283,12 +271,8 @@ export default function ViewEntry() {
   if (loading) {
     return (
       <div className="h-dvh flex flex-col overflow-hidden transition-colors duration-200" style={{ background: 'var(--bg-app)' }}>
-        <Navbar />
-        <main className="flex-1 min-h-0 w-full max-w-3xl mx-auto px-3 sm:px-6 py-4">
-          <div
-            className="rounded-2xl p-6 space-y-4 shadow-sm h-full"
-            style={{ background: 'var(--panel-gradient)', border: '1px solid var(--border-color)' }}
-          >
+        <main className="flex-1 min-h-0 w-full mx-auto flex flex-col px-3 py-4">
+          <div className="space-y-4 h-full">
             <div className="h-8 rounded w-2/3 skeleton" />
             <div className="h-3 rounded w-1/3 skeleton" />
             <div className="space-y-3 mt-6">
@@ -303,32 +287,17 @@ export default function ViewEntry() {
   }
 
   const currentMood = moodMap[mood];
-  const wordCount = countBlockWords(blocks);
   const createdAtDate = entry ? new Date(entry.entryDate || entry.createdAt) : new Date();
-  const canSave = Boolean(title.trim()) && hasBlockContent(blocks);
 
   return (
     <div className="h-dvh flex flex-col overflow-hidden transition-colors duration-200" style={{ background: 'var(--bg-app)' }}>
-      <Navbar />
-
-      <main className="flex-1 min-h-0 w-full max-w-3xl mx-auto px-3 sm:px-6 py-3 sm:py-6 flex flex-col">
-        {/* Back */}
-        <button
-          onClick={handleBack}
-          className="flex items-center gap-1.5 text-sm mb-3 flex-shrink-0 self-start transition-colors cursor-pointer"
-          style={{ color: topMuted }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--gold)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = topMuted; }}
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to diary
-        </button>
-
+      <main className="flex-1 min-h-0 w-full mx-auto flex flex-col">
+        <form onSubmit={(e) => { e.preventDefault(); if (editing) handleSave(); }} className="flex-1 min-h-0 flex flex-col">
         <article
-          className="flex-1 min-h-0 flex flex-col rounded-2xl overflow-hidden fade-up shadow-sm relative"
+          className="flex-1 min-h-0 flex flex-col overflow-hidden fade-up shadow-sm relative"
           style={{
             background: 'var(--panel-gradient)',
-            border: '1px solid var(--border-color)',
+            border: 'none',
           }}
         >
           {/* Gold top accent */}
@@ -337,180 +306,127 @@ export default function ViewEntry() {
             style={{ background: 'linear-gradient(90deg, transparent, var(--gold), transparent)' }}
           />
 
-          {/* Header */}
+          {/* Date header + actions */}
           <div
-            className="px-4 sm:px-8 pt-4 pb-4 flex-shrink-0"
+            className="px-3 pt-4 pb-3 flex-shrink-0 flex items-center gap-2 flex-wrap"
             style={{ borderBottom: '1px solid var(--border-color)' }}
           >
-            <div className="flex flex-wrap items-center gap-2 mb-3">
-              <span className="text-[11px] sm:text-xs uppercase tracking-widest font-medium" style={{ color: topMuted }}>
-                {formatDate(createdAtDate)} · {formatTime(createdAtDate)}
+            <span className="text-[11px] sm:text-xs uppercase tracking-widest font-medium" style={{ color: topMuted }}>
+              {formatDate(createdAtDate)} · {formatTime(createdAtDate)}
+            </span>
+            {!editing && currentMood && (
+              <span
+                className="flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full"
+                style={{
+                  background: `${currentMood.color}15`,
+                  border: `1px solid ${currentMood.color}35`,
+                  color: currentMood.color,
+                }}
+              >
+                {currentMood.emoji} {currentMood.label}
               </span>
-              {wordCount > 0 && !editing && (
-                <span className="text-xs" style={{ color: topMuted }}>
-                  · {wordCount} {wordCount === 1 ? 'word' : 'words'}
-                </span>
-              )}
-              {!editing && currentMood && (
-                <span
-                  className="flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full"
-                  style={{
-                    background: `${currentMood.color}15`,
-                    border: `1px solid ${currentMood.color}35`,
-                    color: currentMood.color,
-                  }}
+            )}
+            <div className="ml-auto flex items-center gap-1 flex-shrink-0">
+              {editing ? (
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg transition-all cursor-pointer"
+                  style={{ color: 'var(--text-muted)' }}
                 >
-                  {currentMood.emoji} {currentMood.label}
-                </span>
+                  <X className="w-3.5 h-3.5" />
+                  Cancel
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setEditing(true)}
+                    className="p-2 rounded-lg transition-all cursor-pointer"
+                    style={{ color: 'var(--gold)' }}
+                    title="Edit entry"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowDelete(true)}
+                    className="p-2 rounded-lg transition-all cursor-pointer"
+                    style={{ color: 'var(--text-ghost)' }}
+                    title="Delete entry"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Delete confirm */}
+          {showDelete && !editing && (
+            <div className="px-3 py-2 flex-shrink-0 flex items-center gap-2 flex-wrap" style={{ borderBottom: '1px solid var(--border-color)' }}>
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Delete this entry?</span>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting}
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all cursor-pointer disabled:opacity-50"
+                style={{ background: 'rgba(224,85,85,0.15)', color: '#e05555', border: '1px solid rgba(224,85,85,0.3)' }}
+              >
+                {deleting ? 'Deleting…' : 'Yes, delete'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowDelete(false)}
+                className="text-xs cursor-pointer"
+                style={{ color: 'var(--text-ghost)' }}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
+          {/* Upload progress — only shows while photos are saving */}
+          {uploadStatus && (
+            <p className="flex items-center gap-2 text-xs px-3 py-2 flex-shrink-0" style={{ color: 'var(--gold)', borderBottom: '1px solid var(--border-color)' }}>
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              {uploadStatus}
+            </p>
+          )}
+
+          {/* Body — title scrolls together with the text */}
+          <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-6 scroll-pb-32 sm:scroll-pb-28" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <div className="pt-4 pb-1">
+              {editing ? (
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  maxLength={200}
+                  placeholder="Entry title…"
+                  className="w-full outline-none bg-transparent font-display text-2xl sm:text-3xl transition-colors"
+                  style={{ color: topInk, fontWeight: 400 }}
+                />
+              ) : (
+                <h1
+                  className="font-display text-2xl sm:text-3xl leading-snug"
+                  style={{ color: topInk, fontWeight: 400 }}
+                >
+                  {title || 'Untitled Entry'}
+                </h1>
               )}
             </div>
 
-            {editing ? (
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                maxLength={200}
-                className="w-full outline-none bg-transparent font-display text-2xl sm:text-3xl"
-                style={{
-                  color: topInk,
-                  fontWeight: 400,
-                  borderBottom: '1px solid var(--border-bright)',
-                  paddingBottom: '4px',
-                }}
-              />
-            ) : (
-              <h1
-                className="font-display text-2xl sm:text-3xl leading-snug"
-                style={{ color: topInk, fontWeight: 400 }}
-              >
-                {title || 'Untitled Entry'}
-              </h1>
-            )}
-          </div>
+            <div className="my-2" style={{ height: '1px', background: 'var(--border-color)' }} />
 
-          {/* Body — only this part scrolls, and only when content is long */}
-          <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 py-4 scroll-pb-32 sm:scroll-pb-28" style={{ WebkitOverflowScrolling: 'touch' }}>
             {editing ? (
-              <BlockEditor blocks={blocks} onChange={setBlocks} cryptoKey={cryptoKey} disabled={saving} hideToolbar={keyboardOpen} />
+              <BlockEditor blocks={blocks} onChange={setBlocks} cryptoKey={cryptoKey} disabled={saving} hideToolbar={keyboardOpen} mood={mood} onMoodChange={setMood} />
             ) : (
               <EntryContent blocks={blocks} cryptoKey={cryptoKey} metas={mediaMetas} />
             )}
           </div>
-
-          {/* Floating save while typing — footer is hidden so text stays visible */}
-          {editing && keyboardOpen && (
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving || !canSave}
-              className="absolute bottom-3 right-3 z-20 flex items-center gap-1.5 px-4 py-2.5 rounded-full text-sm font-semibold shadow-lg disabled:opacity-40 cursor-pointer"
-              style={{ background: 'linear-gradient(135deg, #c4913a, #dba84a)', color: '#0c0c17' }}
-            >
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              {saving ? 'Saving…' : 'Save'}
-            </button>
-          )}
-
-          {/* Footer — hidden while typing so it never covers what you write */}
-          {!(editing && keyboardOpen) && (
-          <div
-            className="px-4 sm:px-8 py-3 flex-shrink-0 space-y-3"
-            style={{ borderTop: '1px solid var(--border-color)', background: 'var(--bg-surface)' }}
-          >
-            {uploadStatus && (
-              <p className="flex items-center gap-2 text-xs" style={{ color: 'var(--gold)' }}>
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                {uploadStatus}
-              </p>
-            )}
-
-            {editing && (
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 [&>div]:flex-nowrap [&>div]:w-max">
-                <span className="text-[11px] uppercase tracking-widest font-medium flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
-                  Mood
-                </span>
-                <MoodPicker value={mood} onChange={setMood} />
-              </div>
-            )}
-
-            <div className="flex items-center justify-between gap-3">
-              {/* Delete */}
-              <div className="min-w-0">
-                {showDelete ? (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs sm:text-sm" style={{ color: 'var(--text-muted)' }}>Delete this entry?</span>
-                    <button
-                      onClick={handleDelete}
-                      disabled={deleting}
-                      className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all cursor-pointer disabled:opacity-50"
-                      style={{ background: 'rgba(224,85,85,0.15)', color: '#e05555', border: '1px solid rgba(224,85,85,0.3)' }}
-                    >
-                      {deleting ? 'Deleting…' : 'Yes, delete'}
-                    </button>
-                    <button
-                      onClick={() => setShowDelete(false)}
-                      className="text-xs cursor-pointer"
-                      style={{ color: 'var(--text-ghost)' }}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setShowDelete(true)}
-                    className="flex items-center gap-1.5 text-sm transition-colors cursor-pointer"
-                    style={{ color: 'var(--text-ghost)' }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = '#e05555'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-ghost)'; }}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Delete</span>
-                  </button>
-                )}
-              </div>
-
-              {/* Edit / Save / Cancel */}
-              <div className="flex items-center gap-2 flex-shrink-0">
-                {editing ? (
-                  <>
-                    <button
-                      onClick={handleCancelEdit}
-                      className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg transition-all cursor-pointer"
-                      style={{ color: 'var(--text-muted)' }}
-                    >
-                      <X className="w-3.5 h-3.5" />
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleSave}
-                      disabled={saving || !canSave}
-                      className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 cursor-pointer shadow-sm"
-                      style={{ background: 'linear-gradient(135deg, #c4913a, #dba84a)', color: '#0c0c17' }}
-                    >
-                      {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                      {saving ? 'Saving…' : 'Save Changes'}
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    onClick={() => setEditing(true)}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer"
-                    style={{
-                      background: 'var(--gold-glow)',
-                      border: '1px solid var(--border-bright)',
-                      color: 'var(--gold)',
-                    }}
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                    Edit
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-          )}
         </article>
+        </form>
       </main>
     </div>
   );
