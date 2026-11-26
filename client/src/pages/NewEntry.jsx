@@ -2,7 +2,6 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Loader2, CalendarDays } from 'lucide-react';
 import toast from 'react-hot-toast';
-import Navbar from '../components/Navbar.jsx';
 import BlockEditor from '../components/BlockEditor.jsx';
 import { uploadMediaFile } from '../api/mediaApi.js';
 import apiClient from '../api/apiClient.js';
@@ -97,7 +96,7 @@ export default function NewEntry() {
   // Automatic saving draft: text/title/mood -> localStorage, pending image blobs -> IndexedDB.
   const draftContent = useMemo(() => blocksToDraftString(blocks), [blocks]);
 
-  const { hasRestoredDraft, clearDraft, markRestored } = useAutoSave({
+  const { clearDraft, markRestored } = useAutoSave({
     draftId: 'new_entry',
     data: { title, content: draftContent, mood, entryDate },
   });
@@ -199,22 +198,6 @@ export default function NewEntry() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingSig, draftKey, mediaResolved]);
-
-  const handleDiscardDraft = useCallback(() => {
-    clearDraft();
-    clearDraftBlobs(draftKey).catch(() => {});
-    // Wipe the visible editor immediately — don't wait for a navigation
-    // round-trip to make the cleared draft apparent.
-    setTitle('');
-    setMood('');
-    setEntryDate(initialDateKey);
-    setBlocks(normalizeBlocks([createTextBlock('')]));
-    setMediaResolved(true);
-  }, [clearDraft, draftKey, initialDateKey]);
-
-  const wordCount = countBlockWords(blocks);
-  const charCount = blocksToPlainText(blocks).length;
-  const canSave = Boolean(title.trim()) && hasBlockContent(blocks);
 
   const encryptEntry = async (blocksToSave) => {
     const { ciphertext: encryptedTitle, iv: titleIv } = await encrypt(cryptoKey, title.trim());
@@ -321,7 +304,8 @@ export default function NewEntry() {
     }
   };
 
-  const isToday = entryDate === todayKey;  const dateLabel = isToday
+  const isToday = entryDate === todayKey;
+  const dateLabel = isToday
     ? new Date().toLocaleDateString('en-US', {
         weekday: 'long',
         month: 'long',
@@ -330,47 +314,16 @@ export default function NewEntry() {
       })
     : formatDateKey(entryDate);
 
-  const handleBack = () => {
-    if (window.history.length > 1) {
-      navigate(-1);
-    } else {
-      navigate('/dashboard');
-    }
-  };
-
   return (
     <div className="h-dvh flex flex-col overflow-hidden transition-colors duration-200" style={{ background: 'var(--bg-app)' }}>
-      {/* Hidden while typing so the editor uses the full screen */}
-      {!keyboardOpen && <Navbar />}
-
-      <main className={`flex-1 min-h-0 w-full mx-auto flex flex-col ${keyboardOpen ? 'px-0 py-0' : 'max-w-3xl px-3 sm:px-6 py-3 sm:py-6'}`}>
-        {/* Back + Discard — hidden while typing so text uses the full screen */}
-        {!keyboardOpen && (
-        <div className="flex items-center justify-between mb-3 flex-shrink-0">
-          <button
-            onClick={handleBack}
-            className="flex items-center gap-1.5 text-sm transition-colors cursor-pointer"
-            style={{ color: topMuted }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--gold)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = topMuted; }}
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to diary
-          </button>
-          {hasRestoredDraft && (
-            <button type="button" onClick={handleDiscardDraft} className="text-xs underline cursor-pointer" style={{ color: 'var(--gold)' }}>
-              Discard
-            </button>
-          )}
-        </div>
-        )}
+      <main className="flex-1 min-h-0 w-full mx-auto flex flex-col px-0 py-0">
 
         <form onSubmit={handleSave} className="flex-1 min-h-0 flex flex-col">
           <div
-            className={`flex-1 min-h-0 flex flex-col overflow-hidden fade-up shadow-sm relative ${keyboardOpen ? '' : 'rounded-2xl'}`}
+            className="flex-1 min-h-0 flex flex-col overflow-hidden fade-up shadow-sm relative"
             style={{
               background: 'var(--panel-gradient)',
-              border: keyboardOpen ? 'none' : '1px solid var(--border-color)',
+              border: 'none',
             }}
           >
             {/* Gold top accent */}
@@ -381,7 +334,7 @@ export default function NewEntry() {
 
             {/* Date header — tap the day picker to write for a past day */}
             <div
-              className={`${keyboardOpen ? 'px-3' : 'px-4 sm:px-8'} pt-4 pb-3 flex-shrink-0 flex items-center gap-2 flex-wrap`}
+              className="px-3 pt-4 pb-3 flex-shrink-0 flex items-center gap-2 flex-wrap"
               style={{ borderBottom: '1px solid var(--border-color)' }}
             >
               <CalendarDays className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--gold)' }} />
@@ -424,7 +377,7 @@ export default function NewEntry() {
             </div>
 
             {/* Writing area — title scrolls together with the text; only this part scrolls */}
-            <div className={`flex-1 min-h-0 overflow-y-auto ${keyboardOpen ? 'px-3' : 'px-4 sm:px-8'} pb-6 scroll-pb-32 sm:scroll-pb-28`} style={{ WebkitOverflowScrolling: 'touch' }}>
+            <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-6 scroll-pb-32 sm:scroll-pb-28" style={{ WebkitOverflowScrolling: 'touch' }}>
               {/* Title input */}
               <div className="pt-4 pb-1">
                 <input
