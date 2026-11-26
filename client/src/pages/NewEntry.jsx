@@ -65,6 +65,8 @@ export default function NewEntry() {
 
   const [title, setTitle] = useState(initialDraft?.title || '');
   const [mood, setMood] = useState(initialDraft?.mood || '');
+  const titleRef = useRef(null);
+  const [titleError, setTitleError] = useState(false);
   // The diary day this entry belongs to — defaults to today, but any past
   // day can be picked to backfill a missed day.
   const [entryDate, setEntryDate] = useState(() =>
@@ -224,6 +226,13 @@ export default function NewEntry() {
     }
     if (!title.trim()) {
       toast.error('Please add a title for your entry');
+      // Jump to the title so it can be typed even when scrolled down.
+      setTitleError(true);
+      try { titleRef.current?.focus({ preventScroll: true }); } catch (_) { try { titleRef.current?.focus(); } catch (_) {} }
+      setTimeout(() => {
+        try { titleRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) {}
+      }, 100);
+      setTimeout(() => setTitleError(false), 2500);
       return;
     }
     if (!hasBlockContent(blocks)) {
@@ -381,13 +390,19 @@ export default function NewEntry() {
               {/* Title input */}
               <div className="pt-4 pb-1">
                 <input
+                  ref={titleRef}
                   type="text"
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  onChange={(e) => { setTitle(e.target.value); if (titleError) setTitleError(false); }}
                   placeholder="Entry title…"
                   maxLength={200}
-                  className="w-full outline-none bg-transparent font-display text-2xl sm:text-3xl transition-colors"
-                  style={{ color: topInk, fontWeight: 400 }}
+                  className="w-full outline-none bg-transparent font-display text-2xl sm:text-3xl transition-colors rounded-lg"
+                  style={{
+                    color: topInk,
+                    fontWeight: 400,
+                    boxShadow: titleError ? '0 0 0 2px rgba(224,85,85,0.55)' : 'none',
+                    background: titleError ? 'rgba(224,85,85,0.07)' : 'transparent',
+                  }}
                 />
               </div>
 

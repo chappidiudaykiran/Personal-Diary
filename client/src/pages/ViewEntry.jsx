@@ -59,6 +59,8 @@ export default function ViewEntry() {
   const [deleting, setDeleting] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
+  const titleRef = useRef(null);
+  const [titleError, setTitleError] = useState(false);
   // Hide footer + toolbar while typing so text stays clearly visible
   const keyboardOpen = useKeyboardOpen();
   const { topInk, topMuted } = useWallpaper();
@@ -160,6 +162,13 @@ export default function ViewEntry() {
     }
     if (!title.trim()) {
       toast.error('Please add a title for your entry');
+      // Jump to the title so it can be typed even when scrolled down.
+      setTitleError(true);
+      try { titleRef.current?.focus({ preventScroll: true }); } catch (_) { try { titleRef.current?.focus(); } catch (_) {} }
+      setTimeout(() => {
+        try { titleRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) {}
+      }, 100);
+      setTimeout(() => setTitleError(false), 2500);
       return;
     }
     if (!hasBlockContent(blocks)) {
@@ -327,7 +336,7 @@ export default function ViewEntry() {
               </span>
             )}
             <div className="ml-auto flex items-center gap-1 flex-shrink-0">
-              {editing ? (
+              {editing && (
                 <button
                   type="button"
                   onClick={handleCancelEdit}
@@ -337,54 +346,9 @@ export default function ViewEntry() {
                   <X className="w-3.5 h-3.5" />
                   Cancel
                 </button>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setEditing(true)}
-                    className="p-2 rounded-lg transition-all cursor-pointer"
-                    style={{ color: 'var(--gold)' }}
-                    title="Edit entry"
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowDelete(true)}
-                    className="p-2 rounded-lg transition-all cursor-pointer"
-                    style={{ color: 'var(--text-ghost)' }}
-                    title="Delete entry"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </>
               )}
             </div>
           </div>
-
-          {/* Delete confirm */}
-          {showDelete && !editing && (
-            <div className="px-3 py-2 flex-shrink-0 flex items-center gap-2 flex-wrap" style={{ borderBottom: '1px solid var(--border-color)' }}>
-              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Delete this entry?</span>
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={deleting}
-                className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all cursor-pointer disabled:opacity-50"
-                style={{ background: 'rgba(224,85,85,0.15)', color: '#e05555', border: '1px solid rgba(224,85,85,0.3)' }}
-              >
-                {deleting ? 'Deleting…' : 'Yes, delete'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowDelete(false)}
-                className="text-xs cursor-pointer"
-                style={{ color: 'var(--text-ghost)' }}
-              >
-                Cancel
-              </button>
-            </div>
-          )}
 
           {/* Upload progress — only shows while photos are saving */}
           {uploadStatus && (
@@ -399,13 +363,19 @@ export default function ViewEntry() {
             <div className="pt-4 pb-1">
               {editing ? (
                 <input
+                  ref={titleRef}
                   type="text"
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  onChange={(e) => { setTitle(e.target.value); if (titleError) setTitleError(false); }}
                   maxLength={200}
                   placeholder="Entry title…"
-                  className="w-full outline-none bg-transparent font-display text-2xl sm:text-3xl transition-colors"
-                  style={{ color: topInk, fontWeight: 400 }}
+                  className="w-full outline-none bg-transparent font-display text-2xl sm:text-3xl transition-colors rounded-lg"
+                  style={{
+                    color: topInk,
+                    fontWeight: 400,
+                    boxShadow: titleError ? '0 0 0 2px rgba(224,85,85,0.55)' : 'none',
+                    background: titleError ? 'rgba(224,85,85,0.07)' : 'transparent',
+                  }}
                 />
               ) : (
                 <h1
@@ -425,6 +395,55 @@ export default function ViewEntry() {
               <EntryContent blocks={blocks} cryptoKey={cryptoKey} metas={mediaMetas} />
             )}
           </div>
+
+          {/* Edit / Delete — clear buttons at the bottom for saved entries */}
+          {!editing && (
+            <div className="px-3 py-2.5 flex-shrink-0 flex items-center gap-2" style={{ borderTop: '1px solid var(--border-color)', background: 'var(--bg-surface)', paddingBottom: 'calc(0.625rem + env(safe-area-inset-bottom, 0px))' }}>
+              {showDelete ? (
+                <>
+                  <span className="text-xs flex-1" style={{ color: 'var(--text-muted)' }}>Delete this entry permanently?</span>
+                  <button
+                    type="button"
+                    onClick={handleDelete}
+                    disabled={deleting}
+                    className="text-xs font-semibold px-4 py-2 rounded-xl transition-all cursor-pointer disabled:opacity-50"
+                    style={{ background: 'rgba(224,85,85,0.15)', color: '#e05555', border: '1px solid rgba(224,85,85,0.3)' }}
+                  >
+                    {deleting ? 'Deleting…' : 'Yes, delete'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowDelete(false)}
+                    className="text-xs font-semibold px-4 py-2 rounded-xl cursor-pointer"
+                    style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-muted)' }}
+                  >
+                    Keep
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setEditing(true)}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer"
+                    style={{ background: 'linear-gradient(135deg, #c4913a, #dba84a)', color: '#0c0c17' }}
+                  >
+                    <Pencil className="w-4 h-4" />
+                    Edit entry
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowDelete(true)}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer"
+                    style={{ background: 'transparent', border: '1px solid rgba(224,85,85,0.4)', color: '#e05555' }}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete
+                  </button>
+                </>
+              )}
+            </div>
+          )}
         </article>
         </form>
       </main>
