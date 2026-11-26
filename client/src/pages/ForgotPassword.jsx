@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRight, ArrowLeft, BookOpen } from 'lucide-react';
+import { ArrowRight, ArrowLeft, BookOpen, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import apiClient from '../api/apiClient.js';
 import { useWallpaper } from '../context/WallpaperContext.jsx';
@@ -15,6 +15,8 @@ export default function ForgotPassword() {
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showNewPw, setShowNewPw] = useState(false);
+  const [showConfirmPw, setShowConfirmPw] = useState(false);
 
   const sendCode = async (e) => {
     e.preventDefault();
@@ -142,24 +144,44 @@ export default function ForgotPassword() {
               className="w-full px-4 py-3 rounded-xl text-sm outline-none tracking-widest text-center"
               style={inputStyle}
             />
-            <input
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="Choose a new password"
-              autoComplete="new-password"
-              className="w-full px-4 py-3 rounded-xl text-sm outline-none"
-              style={inputStyle}
-            />
-            <input
-              type="password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              placeholder="Confirm new password"
-              autoComplete="new-password"
-              className="w-full px-4 py-3 rounded-xl text-sm outline-none"
-              style={inputStyle}
-            />
+            <div className="relative">
+              <input
+                type={showNewPw ? 'text' : 'password'}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Choose a new password"
+                autoComplete="new-password"
+                className="w-full px-4 py-3 pr-11 rounded-xl text-sm outline-none"
+                style={inputStyle}
+              />
+              <button
+                type="button"
+                onClick={() => setShowNewPw(!showNewPw)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 cursor-pointer"
+                style={{ color: 'var(--text-ghost)' }}
+              >
+                {showNewPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            <div className="relative">
+              <input
+                type={showConfirmPw ? 'text' : 'password'}
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                placeholder="Confirm new password"
+                autoComplete="new-password"
+                className="w-full px-4 py-3 pr-11 rounded-xl text-sm outline-none"
+                style={inputStyle}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPw(!showConfirmPw)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 cursor-pointer"
+                style={{ color: 'var(--text-ghost)' }}
+              >
+                {showConfirmPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
             {error && <p className="text-xs py-2 px-3 rounded-lg" style={{ color: '#e05555', background: 'rgba(224,85,85,0.08)', border: '1px solid rgba(224,85,85,0.2)' }}>{error}</p>}
             <button type="submit" disabled={loading} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold cursor-pointer disabled:opacity-60" style={{ background: 'linear-gradient(135deg, #c4913a, #dba84a)', color: '#0c0c17' }}>
               {loading ? 'Saving…' : (<>Save new password <ArrowRight className="w-4 h-4" /></>)}
