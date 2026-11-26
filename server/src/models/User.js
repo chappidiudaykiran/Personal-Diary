@@ -55,11 +55,13 @@ const userSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-    // Never return passwordHash or refreshTokens in API responses
+    // Never return secrets in API responses
     toJSON: {
       transform(doc, ret) {
         delete ret.passwordHash;
         delete ret.refreshTokens;
+        delete ret.resetPasswordCodeHash;
+        delete ret.resetPasswordExpires;
         return ret;
       },
     },

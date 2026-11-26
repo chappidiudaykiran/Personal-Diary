@@ -44,7 +44,11 @@ router.post(
   '/register',
   [
     body('username').trim().isLength({ min: 3, max: 30 }).withMessage('Username must be 3–30 characters'),
-    body('email').isEmail().normalizeEmail().withMessage('Valid email required'),
+    // NOTE: no .normalizeEmail() here — we apply normalizeEmailForLookup() below
+    // so register / login / forgot-password all use the exact same Gmail
+    // dot + subaddress normalization. Using validator's magic in only one
+    // place caused dotted Gmail logins to miss.
+    body('email').isEmail().withMessage('Valid email required'),
     body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
   ],
   async (req, res) => {
@@ -58,7 +62,7 @@ router.post(
 
     const { username, email, password } = req.body;
     const cleanUsername = username.trim();
-    const cleanEmail = email.trim().toLowerCase();
+    const cleanEmail = normalizeEmailForLookup(email);
 
     try {
       // Check for existing user (case-insensitive)

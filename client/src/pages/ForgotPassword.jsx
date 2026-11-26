@@ -59,6 +59,13 @@ export default function ForgotPassword() {
         code: code.trim(),
         newPassword,
       });
+      try {
+        // Old PIN vault holds the OLD password — must go or next unlock derives a wrong key.
+        localStorage.removeItem('diary_pin_vault');
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('user');
+      } catch (_) {}
       toast.success(data.message || 'Password reset successful');
       navigate('/login');
     } catch (err) {
