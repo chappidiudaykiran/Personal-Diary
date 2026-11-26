@@ -77,8 +77,8 @@ export default function ForgotPassword() {
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
       } catch (_) {}
-      toast.success('Your password is updated! Please sign in.');
-      navigate('/login');
+      toast.success('Your password has been changed! Please sign in with your new password.');
+      navigate('/login', { state: { resetMessage: 'Your password has been changed. Please sign in with your new password.' } });
     } catch (err) {
       const msg = err.response?.data?.message || 'Something went wrong. Please check the number and try again.';
       setError(msg);

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, ArrowRight, BookOpen, Sun, Moon } from 'lucide-react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Eye, EyeOff, ArrowRight, BookOpen, CheckCircle2, Sun, Moon } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext.jsx';
 import { friendlyServerError } from '../utils/friendlyError.js';
@@ -12,6 +12,8 @@ export default function Login() {
   const { isDark, toggleTheme } = useTheme();
   const { topInk, topMuted } = useWallpaper();
   const navigate = useNavigate();
+  const location = useLocation();
+  const resetMessage = location.state?.resetMessage || '';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
@@ -137,6 +139,12 @@ export default function Login() {
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-4">
+              {resetMessage && (
+                <div className="flex items-start gap-2 text-xs py-2.5 px-3 rounded-lg" style={{ color: '#3f9e4d', background: 'rgba(63,158,77,0.08)', border: '1px solid rgba(63,158,77,0.25)' }}>
+                  <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-px" />
+                  <span>{resetMessage}</span>
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-medium mb-2 uppercase tracking-wider" style={{ color: topMuted }}>
                   Email or Username
