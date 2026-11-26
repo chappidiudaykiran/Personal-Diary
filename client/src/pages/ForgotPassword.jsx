@@ -113,10 +113,6 @@ export default function ForgotPassword() {
             : `We have sent a verification number to ${email.trim()}. Please enter it below within 10 minutes.`}
         </p>
 
-        <div className="text-xs py-2 px-3 rounded-lg mb-4" style={{ color: '#d4a24a', background: 'rgba(212,162,74,0.08)', border: '1px solid rgba(212,162,74,0.25)' }}>
-          Don&apos;t worry — your diary entries are safe and nothing will be deleted.
-        </div>
-
         {step === 1 ? (
           <form onSubmit={sendCode} className="space-y-4">
             <input
