@@ -425,23 +425,23 @@ export default function NewEntry() {
               </div>
             </div>
 
-            {/* Title input */}
-            <div className={`${keyboardOpen ? 'px-3' : 'px-4 sm:px-8'} pt-4 pb-1 flex-shrink-0`}>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Entry title…"
-                maxLength={200}
-                className="w-full outline-none bg-transparent font-display text-2xl sm:text-3xl transition-colors"
-                style={{ color: topInk, fontWeight: 400 }}
-              />
-            </div>
-
-            <div className={`${keyboardOpen ? 'mx-3' : 'mx-4 sm:mx-8'} my-2 flex-shrink-0`} style={{ height: '1px', background: 'var(--border-color)' }} />
-
-            {/* Writing area — only this part scrolls, and only when content is long */}
+            {/* Writing area — title scrolls together with the text; only this part scrolls */}
             <div className={`flex-1 min-h-0 overflow-y-auto ${keyboardOpen ? 'px-3' : 'px-4 sm:px-8'} pb-6 scroll-pb-32 sm:scroll-pb-28`} style={{ WebkitOverflowScrolling: 'touch' }}>
+              {/* Title input */}
+              <div className="pt-4 pb-1">
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Entry title…"
+                  maxLength={200}
+                  className="w-full outline-none bg-transparent font-display text-2xl sm:text-3xl transition-colors"
+                  style={{ color: topInk, fontWeight: 400 }}
+                />
+              </div>
+
+              <div className="my-2" style={{ height: '1px', background: 'var(--border-color)' }} />
+
               <BlockEditor blocks={blocks} onChange={setBlocks} cryptoKey={cryptoKey} disabled={saving} hideToolbar={keyboardOpen} />
             </div>
 
