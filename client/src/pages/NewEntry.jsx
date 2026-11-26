@@ -1,9 +1,8 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Save, Loader2, CalendarDays } from 'lucide-react';
+import { ArrowLeft, Loader2, CalendarDays } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar.jsx';
-import MoodPicker from '../components/MoodPicker.jsx';
 import BlockEditor from '../components/BlockEditor.jsx';
 import { uploadMediaFile } from '../api/mediaApi.js';
 import apiClient from '../api/apiClient.js';
@@ -98,15 +97,7 @@ export default function NewEntry() {
   // Automatic saving draft: text/title/mood -> localStorage, pending image blobs -> IndexedDB.
   const draftContent = useMemo(() => blocksToDraftString(blocks), [blocks]);
 
-  const {
-    autoSaveEnabled,
-    toggleAutoSave,
-    status: autoSaveStatus,
-    lastSavedAt,
-    hasRestoredDraft,
-    clearDraft,
-    markRestored,
-  } = useAutoSave({
+  const { hasRestoredDraft, clearDraft, markRestored } = useAutoSave({
     draftId: 'new_entry',
     data: { title, content: draftContent, mood, entryDate },
   });
@@ -353,18 +344,25 @@ export default function NewEntry() {
       {!keyboardOpen && <Navbar />}
 
       <main className={`flex-1 min-h-0 w-full mx-auto flex flex-col ${keyboardOpen ? 'px-0 py-0' : 'max-w-3xl px-3 sm:px-6 py-3 sm:py-6'}`}>
-        {/* Back — hidden while typing so text uses the full screen */}
+        {/* Back + Discard — hidden while typing so text uses the full screen */}
         {!keyboardOpen && (
-        <button
-          onClick={handleBack}
-          className="flex items-center gap-1.5 text-sm mb-3 flex-shrink-0 self-start transition-colors cursor-pointer"
-          style={{ color: topMuted }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--gold)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = topMuted; }}
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to diary
-        </button>
+        <div className="flex items-center justify-between mb-3 flex-shrink-0">
+          <button
+            onClick={handleBack}
+            className="flex items-center gap-1.5 text-sm transition-colors cursor-pointer"
+            style={{ color: topMuted }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--gold)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = topMuted; }}
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to diary
+          </button>
+          {hasRestoredDraft && (
+            <button type="button" onClick={handleDiscardDraft} className="text-xs underline cursor-pointer" style={{ color: 'var(--gold)' }}>
+              Discard
+            </button>
+          )}
+        </div>
         )}
 
         <form onSubmit={handleSave} className="flex-1 min-h-0 flex flex-col">
@@ -445,89 +443,12 @@ export default function NewEntry() {
               <BlockEditor blocks={blocks} onChange={setBlocks} cryptoKey={cryptoKey} disabled={saving} hideToolbar={keyboardOpen} />
             </div>
 
-            {/* Footer — hidden while typing so it never covers what you write */}
-            {!keyboardOpen && (
-            <div
-              className="px-4 sm:px-8 py-3 flex-shrink-0 space-y-3"
-              style={{ borderTop: '1px solid var(--border-color)', background: 'var(--bg-surface)' }}
-            >
-              {uploadStatus && (
-                <p className="flex items-center gap-2 text-xs" style={{ color: 'var(--gold)' }}>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  {uploadStatus}
-                </p>
-              )}
-
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 [&>div]:flex-nowrap [&>div]:w-max">
-                <span className="text-[11px] uppercase tracking-widest font-medium flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
-                  Mood
-                </span>
-                <MoodPicker value={mood} onChange={setMood} />
-              </div>
-
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <button
-                  type="button"
-                  onClick={toggleAutoSave}
-                  className="flex items-center gap-2 text-[11px] cursor-pointer rounded-full px-2.5 py-1 transition-colors"
-                  style={{
-                    background: autoSaveEnabled ? 'var(--gold-glow)' : 'var(--bg-elevated)',
-                    border: '1px solid var(--border-color)',
-                    color: autoSaveEnabled ? 'var(--gold)' : 'var(--text-ghost)',
-                  }}
-                  title={autoSaveEnabled ? 'Turn automatic saving off' : 'Turn automatic saving on'}
-                >
-                  <span
-                    className="w-6 h-3.5 rounded-full relative transition-colors flex-shrink-0"
-                    style={{ background: autoSaveEnabled ? 'var(--gold)' : 'var(--border-color)' }}
-                  >
-                    <span
-                      className="absolute top-0.5 w-2.5 h-2.5 rounded-full bg-white transition-all"
-                      style={{ left: autoSaveEnabled ? '12px' : '2px' }}
-                    />
-                  </span>
-                  Automatic saving {autoSaveEnabled ? 'on' : 'off'}
-                </button>
-                <span className="text-[11px]" style={{ color: 'var(--text-ghost)' }}>
-                  {autoSaveStatus === 'saving' ? 'Saving…' : autoSaveStatus === 'saved' && lastSavedAt ? `Saved ${lastSavedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : autoSaveStatus === 'restored' || hasRestoredDraft ? 'Your unsaved entry is back' : autoSaveStatus === 'disabled' ? 'Automatic saving off' : ''}
-                  {hasRestoredDraft && (
-                    <button type="button" onClick={handleDiscardDraft} className="ml-2 underline cursor-pointer" style={{ color: 'var(--gold)' }}>
-                      Discard
-                    </button>
-                  )}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 text-[11px] flex-shrink-0" style={{ color: 'var(--text-ghost)' }}>
-                  <span>{wordCount} {wordCount === 1 ? 'word' : 'words'}</span>
-                  <span>{charCount} characters</span>
-                </div>
-                <button
-                  type="submit"
-                  disabled={saving || !canSave}
-                  className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 disabled:opacity-40 cursor-pointer shadow-sm flex-shrink-0"
-                  style={{
-                    background: saving || !canSave
-                      ? 'rgba(196,145,58,0.3)'
-                      : 'linear-gradient(135deg, #c4913a, #dba84a)',
-                    color: saving || !canSave ? 'var(--text-muted)' : '#0c0c17',
-                  }}
-                >
-                  {saving ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Saving…
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4" />
-                      Save Entry
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
+            {/* Upload progress — only shows while photos are saving */}
+            {uploadStatus && (
+              <p className="flex items-center gap-2 text-xs px-4 sm:px-8 py-2 flex-shrink-0" style={{ color: 'var(--gold)', borderTop: '1px solid var(--border-color)' }}>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                {uploadStatus}
+              </p>
             )}
           </div>
         </form>
