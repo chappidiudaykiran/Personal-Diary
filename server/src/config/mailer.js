@@ -21,6 +21,11 @@ async function sendResetCode(toEmail, code) {
     console.log(`[auth] SMTP not configured — reset code for ${toEmail}: ${code}`);
     return { delivered: false, previewCode: process.env.NODE_ENV !== 'production' ? code : undefined };
   }
+  // Timeouts so a slow/blocked SMTP server can never hang the /forgot-password
+  // request (which is what stuck the app on "Sending...").
+  tr.options.connectionTimeout = 8000;
+  tr.options.greetingTimeout = 8000;
+  tr.options.socketTimeout = 10000;
   await tr.sendMail({
     from: `"My Diary" <${process.env.SMTP_USER}>`,
     to: toEmail,

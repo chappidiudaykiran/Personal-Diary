@@ -318,13 +318,13 @@ router.post(
       user.resetPasswordCodeHash = codeHash;
       user.resetPasswordExpires = new Date(Date.now() + 10 * 60 * 1000);
       await user.save({ validateBeforeSave: false });
-      try {
-        await sendResetCode(user.email, code);
-      } catch (mailErr) {
+      // Respond immediately so the app never sticks on "Sending..." during
+      // Render cold starts or slow SMTP. Email goes out in the background.
+      res.json({ message: 'If an account exists for this email, a reset code was sent.' });
+      sendResetCode(user.email, code).catch((mailErr) => {
         console.error('Reset email failed:', mailErr.message);
-        // Still return generic success; code is in logs only when SMTP missing.
-      }
-      return res.json({ message: 'If an account exists for this email, a reset code was sent.' });
+      });
+      return;
     } catch (error) {
       console.error('Forgot-password error:', error);
       return res.status(500).json({ message: 'Server error, please try again' });
