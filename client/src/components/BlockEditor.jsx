@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  ImagePlus,
-  Type,
+  Paperclip,
+  Camera,
+  Send,
+  Check,
   X,
   ChevronUp,
   ChevronDown,
@@ -119,6 +121,9 @@ function AsideFilePreview({ file }) {
 
 export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = false, hideToolbar = false }) {
   const fileInputRef = useRef(null);
+  const composerRef = useRef(null);
+  const cameraInputRef = useRef(null);
+  const [composer, setComposer] = useState('');
   const activeRef = useRef({ key: null, cursor: 0 });
   const focusKeyRef = useRef(null);
   const [, setFocusTick] = useState(0);
@@ -195,8 +200,7 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
     if (mediaBlocks[0]) setSelectedKey(mediaBlocks[0].key);
   };
 
-  const insertTextBlock = () => {
-    const tidied = tidyTextBlocks(blocks);
+  const insertTextBlock = () => {    const tidied = tidyTextBlocks(blocks);
     if (tidied.length !== blocks.length) onChange(tidied);
     const list = tidied;
     let index = list.findIndex((b) => b.key === activeRef.current.key);
@@ -215,6 +219,26 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
     }
     const tb = createTextBlock(''); const next = [...list.slice(0, index + 1), tb, ...list.slice(index + 1)];
     onChange(next); focusBlock(tb.key);
+  };
+
+  // WhatsApp-style composer: typed text is appended to the entry,
+  // attachments are inserted as media blocks.
+  const sendComposer = () => {
+    const text = composer.trim();
+    if (!text || disabled) return;
+    const list = tidyTextBlocks(blocks);
+    const last = list[list.length - 1];
+    if (last?.type === 'text') {
+      onChange([...list.slice(0, -1), { ...last, text: last.text ? `${last.text}\n${text}` : text }]);
+    } else {
+      onChange([...list, createTextBlock(text)]);
+    }
+    setComposer('');
+    // Stay in the composer for the next line, chat-style.
+    setTimeout(() => {
+      try { composerRef.current?.focus({ preventScroll: true }); }
+      catch (_) { try { composerRef.current?.focus(); } catch (_) {} }
+    }, 0);
   };
 
   const removeBlock = (index) => {
@@ -371,13 +395,39 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
         <div className="h-24 sm:h-20" aria-hidden="true" />
       </div>
 
-      {!hideToolbar && (
-      <div className="sticky bottom-2 mt-3 flex items-center gap-2 rounded-xl px-2 py-2 z-10" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', boxShadow: '0 -4px 16px rgba(0,0,0,0.12)', marginBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-        <button type="button" disabled={disabled} onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #c4913a, #dba84a)', color: '#0c0c17' }}><ImagePlus className="w-4 h-4" />Add photo</button>
-        <button type="button" disabled={disabled} onClick={insertTextBlock} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium cursor-pointer disabled:opacity-50" style={{ background: 'var(--bg-raised)', border: '1px solid var(--border-color)', color: 'var(--text-muted)' }}><Type className="w-4 h-4" />Text</button>
+      {/* WhatsApp-style composer: message pill + attach + camera + round send/save.
+          Always visible (even while typing) — it is the typing surface. */}
+      <div className="sticky bottom-2 mt-3 z-10 flex items-center gap-2" style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+        <div className="flex-1 flex items-center gap-0.5 rounded-full pl-4 pr-1.5 py-1" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', boxShadow: '0 -4px 16px rgba(0,0,0,0.12)' }}>
+          <input
+            ref={composerRef}
+            value={composer}
+            disabled={disabled}
+            onChange={(e) => setComposer(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendComposer(); } }}
+            placeholder="Message"
+            className="flex-1 min-w-0 bg-transparent outline-none text-sm sm:text-base py-2"
+            style={{ color: 'var(--text-primary)' }}
+          />
+          <button type="button" disabled={disabled} onClick={() => fileInputRef.current?.click()} className="p-2 rounded-full cursor-pointer disabled:opacity-40" style={{ color: 'var(--text-muted)' }} title="Attach photo, video or file">
+            <Paperclip className="w-5 h-5" />
+          </button>
+          <button type="button" disabled={disabled} onClick={() => cameraInputRef.current?.click()} className="p-2 rounded-full cursor-pointer disabled:opacity-40" style={{ color: 'var(--text-muted)' }} title="Take a photo">
+            <Camera className="w-5 h-5" />
+          </button>
+        </div>
+        {composer.trim() ? (
+          <button type="button" disabled={disabled} onClick={sendComposer} className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer disabled:opacity-50" style={{ background: '#00a884', color: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }} title="Add to entry">
+            <Send className="w-5 h-5" />
+          </button>
+        ) : (
+          <button type="submit" disabled={disabled} className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer disabled:opacity-50" style={{ background: '#00a884', color: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }} title="Save entry">
+            <Check className="w-5 h-5" />
+          </button>
+        )}
       </div>
-      )}
       <input ref={fileInputRef} type="file" multiple accept={MEDIA_ACCEPT} className="hidden" onChange={(e) => { insertFiles(e.target.files); e.target.value = ''; }} />
+      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { insertFiles(e.target.files); e.target.value = ''; }} />
     </div>
   );
 }
