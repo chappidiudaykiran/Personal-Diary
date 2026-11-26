@@ -393,7 +393,7 @@ export default function NewEntry() {
 
               <div className="my-2" style={{ height: '1px', background: 'var(--border-color)' }} />
 
-              <BlockEditor blocks={blocks} onChange={setBlocks} cryptoKey={cryptoKey} disabled={saving} hideToolbar={keyboardOpen} />
+              <BlockEditor blocks={blocks} onChange={setBlocks} cryptoKey={cryptoKey} disabled={saving} hideToolbar={keyboardOpen} mood={mood} onMoodChange={setMood} />
             </div>
 
             {/* Upload progress — only shows while photos are saving */}

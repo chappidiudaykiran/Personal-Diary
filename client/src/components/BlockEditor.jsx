@@ -4,6 +4,7 @@ import {
   Camera,
   Send,
   Check,
+  Smile,
   X,
   ChevronUp,
   ChevronDown,
@@ -21,6 +22,7 @@ import {
   formatFileSize,
 } from '../api/mediaApi.js';
 import { InlineMedia } from './InlineMedia.jsx';
+import { MOODS } from './MoodPicker.jsx';
 import { createTextBlock, createMediaBlock, clampAsideWidth } from '../utils/entryBlocks.js';
 
 function AutoTextarea({ blockKey, value, onChange, onCursor, placeholder, disabled, first }) {
@@ -119,11 +121,13 @@ function AsideFilePreview({ file }) {
   );
 }
 
-export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = false, hideToolbar = false }) {
+export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = false, hideToolbar = false, mood = '', onMoodChange = null }) {
   const fileInputRef = useRef(null);
   const composerRef = useRef(null);
   const cameraInputRef = useRef(null);
   const [composer, setComposer] = useState('');
+  const [showMoods, setShowMoods] = useState(false);
+  const currentMood = MOODS.find((m) => m.value === mood) || null;
   const activeRef = useRef({ key: null, cursor: 0 });
   const focusKeyRef = useRef(null);
   const [, setFocusTick] = useState(0);
@@ -398,7 +402,28 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
       {/* WhatsApp-style composer: message pill + attach + camera + round send/save.
           Always visible — while typing it sits flush above the keyboard. */}
       <div className={`sticky z-10 flex items-center gap-2 ${hideToolbar ? 'bottom-0 px-1 pb-1 pt-1' : 'bottom-2 mt-3'}`} style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)', background: hideToolbar ? 'var(--bg-app)' : 'transparent' }}>
-        <div className="flex-1 flex items-center gap-0.5 rounded-full pl-4 pr-1.5 py-1" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', boxShadow: '0 -4px 16px rgba(0,0,0,0.12)' }}>
+        <div className="relative flex-1">
+          {showMoods && (
+            <div className="absolute bottom-full left-0 mb-2 z-20 flex items-center gap-1 rounded-2xl px-2 py-1.5" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>
+              {MOODS.map((m) => (
+                <button
+                  key={m.value}
+                  type="button"
+                  disabled={disabled}
+                  title={m.label}
+                  onClick={() => { onMoodChange?.(mood === m.value ? '' : m.value); setShowMoods(false); }}
+                  className="w-9 h-9 rounded-full flex items-center justify-center text-xl cursor-pointer disabled:opacity-40"
+                  style={mood === m.value ? { background: `${m.color}30`, border: `1px solid ${m.color}` } : { border: '1px solid transparent' }}
+                >
+                  {m.emoji}
+                </button>
+              ))}
+            </div>
+          )}
+        <div className="flex-1 flex items-center gap-0.5 rounded-full pl-1.5 pr-1.5 py-1" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', boxShadow: '0 -4px 16px rgba(0,0,0,0.12)' }}>
+          <button type="button" disabled={disabled} onClick={() => setShowMoods((s) => !s)} className="p-2 rounded-full cursor-pointer disabled:opacity-40 flex-shrink-0" style={{ color: currentMood ? currentMood.color : 'var(--text-muted)' }} title="How are you feeling?">
+            {currentMood ? <span className="text-xl leading-none">{currentMood.emoji}</span> : <Smile className="w-5 h-5" />}
+          </button>
           <input
             ref={composerRef}
             value={composer}
@@ -415,6 +440,7 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
           <button type="button" disabled={disabled} onClick={() => cameraInputRef.current?.click()} className="p-2 rounded-full cursor-pointer disabled:opacity-40" style={{ color: 'var(--text-muted)' }} title="Take a photo">
             <Camera className="w-5 h-5" />
           </button>
+        </div>
         </div>
         {composer.trim() ? (
           <button type="button" disabled={disabled} onClick={sendComposer} className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #c4913a, #dba84a)', color: '#0c0c17', boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }} title="Add to entry">
