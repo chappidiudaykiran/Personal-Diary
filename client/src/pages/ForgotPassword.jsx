@@ -105,7 +105,7 @@ export default function ForgotPassword() {
         </div>
 
         <h1 className="font-display text-3xl mb-1" style={{ color: topInk, fontWeight: 400 }}>
-          {step === 1 ? 'Trouble signing in?' : 'Check your email'}
+          {step === 1 ? 'Forgot password' : 'Check your email'}
         </h1>
         <p className="text-sm mb-6" style={{ color: topMuted }}>
           {step === 1
