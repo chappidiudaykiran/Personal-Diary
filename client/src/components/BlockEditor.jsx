@@ -421,10 +421,7 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
               ))}
             </div>
           )}
-        <div className="flex-1 flex items-center gap-0.5 rounded-full pl-1.5 pr-1.5 py-1" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', boxShadow: '0 -4px 16px rgba(0,0,0,0.12)' }}>
-          <button type="button" disabled={disabled} onClick={() => setShowMoods((s) => !s)} className="p-2 rounded-full cursor-pointer disabled:opacity-40 flex-shrink-0" style={{ color: currentMood ? currentMood.color : 'var(--text-muted)' }} title="How are you feeling?">
-            {currentMood ? <span className="text-xl leading-none">{currentMood.emoji}</span> : <Smile className="w-5 h-5" />}
-          </button>
+        <div className="flex-1 flex items-center gap-0.5 rounded-full pl-4 pr-1.5 py-1" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', boxShadow: '0 -4px 16px rgba(0,0,0,0.12)' }}>
           <input
             ref={composerRef}
             value=""
@@ -436,6 +433,9 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
             className="flex-1 min-w-0 bg-transparent outline-none text-sm sm:text-base py-2"
             style={{ color: 'var(--text-primary)' }}
           />
+          <button type="button" disabled={disabled} onClick={() => setShowMoods((s) => !s)} className="p-2 rounded-full cursor-pointer disabled:opacity-40 flex-shrink-0" style={{ color: currentMood ? currentMood.color : 'var(--text-muted)' }} title="How are you feeling?">
+            {currentMood ? <span className="text-xl leading-none">{currentMood.emoji}</span> : <Smile className="w-5 h-5" />}
+          </button>
           <button type="button" disabled={disabled} onClick={() => fileInputRef.current?.click()} className="p-2 rounded-full cursor-pointer disabled:opacity-40" style={{ color: 'var(--text-muted)' }} title="Attach photo, video or file">
             <Paperclip className="w-5 h-5" />
           </button>
