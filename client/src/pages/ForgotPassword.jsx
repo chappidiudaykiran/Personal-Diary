@@ -26,7 +26,18 @@ export default function ForgotPassword() {
     setLoading(true);
     try {
       const { data } = await apiClient.post('/auth/forgot-password', { email: email.trim() });
-      toast.success(data.message || 'Reset code sent');
+      if (data.previewCode) {
+        // Dev mode with no mail provider — show the code so testing works
+        // without SMTP. Never happens in production.
+        setCode(data.previewCode);
+        toast.success(`Dev mode: your reset code is ${data.previewCode}`, { duration: 8000 });
+      } else if (data.delivered === false) {
+        toast.error('Reset code could not be emailed — mail service is not configured. Contact support.');
+        setError('Email service is not configured on the server, so the code was not sent. Please try again later.');
+        return;
+      } else {
+        toast.success(data.message || 'Reset code sent');
+      }
       setStep(2);
     } catch (err) {
       const msg = err.response?.data?.message || 'Could not send reset code. Try again.';

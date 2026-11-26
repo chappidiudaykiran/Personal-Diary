@@ -316,13 +316,27 @@ router.post(
       user.resetPasswordCodeHash = codeHash;
       user.resetPasswordExpires = new Date(Date.now() + 10 * 60 * 1000);
       await user.save({ validateBeforeSave: false });
-      // Respond immediately so the app never sticks on "Sending..." during
-      // Render cold starts or slow SMTP. Email goes out in the background.
-      res.json({ message: 'If an account exists for this email, a reset code was sent.' });
-      sendResetCode(user.email, code).catch((mailErr) => {
+      try {
+        // Awaited: when no mail provider is configured this resolves
+        // immediately with { delivered: false, previewCode } in dev.
+        // When SMTP/Brevo is configured it sends before responding so the
+        // client knows the mail actually went out.
+        const result = await sendResetCode(user.email, code);
+        return res.json({
+          message: 'If an account exists for this email, a reset code was sent.',
+          delivered: result.delivered,
+          via: result.via,
+          // Exposed ONLY in non-production when no mail provider exists,
+          // so local testing works without SMTP. Never sent in production.
+          previewCode: result.previewCode,
+        });
+      } catch (mailErr) {
         console.error('Reset email failed:', mailErr.message);
-      });
-      return;
+        return res.json({
+          message: 'If an account exists for this email, a reset code was sent.',
+          delivered: false,
+        });
+      }
     } catch (error) {
       console.error('Forgot-password error:', error);
       return res.status(500).json({ message: 'Server error, please try again' });
@@ -331,8 +345,8 @@ router.post(
 );
 
 // ─── POST /api/auth/reset-password ────────────────────────────────────────
-// Verifies OTP + sets a new password. Wipes encrypted diary data because the
-// encryption key is derived from the old password and cannot be recovered.
+// Verifies OTP + sets a new password. Entries and media are NEVER deleted
+// here — they stay stored untouched.
 router.post(
   '/reset-password',
   [
@@ -362,9 +376,14 @@ router.post(
         return res.status(400).json({ message: 'Code expired, request a new one' });
       }
       const incomingHash = crypto.createHash('sha256').update(code).digest('hex');
-      const a = Buffer.from(incomingHash, 'hex');
-      const b = Buffer.from(user.resetPasswordCodeHash, 'hex');
-      const valid = a.length === b.length && crypto.timingSafeEqual(a, b);
+      let valid = false;
+      try {
+        const a = Buffer.from(incomingHash, 'hex');
+        const b = Buffer.from(user.resetPasswordCodeHash, 'hex');
+        valid = a.length === b.length && a.length > 0 && crypto.timingSafeEqual(a, b);
+      } catch (_) {
+        valid = false;
+      }
       if (!valid) {
         return res.status(400).json({ message: 'Invalid or expired code' });
       }
