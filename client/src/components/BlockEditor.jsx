@@ -417,11 +417,11 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
           </button>
         </div>
         {composer.trim() ? (
-          <button type="button" disabled={disabled} onClick={sendComposer} className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer disabled:opacity-50" style={{ background: '#00a884', color: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }} title="Add to entry">
+          <button type="button" disabled={disabled} onClick={sendComposer} className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #c4913a, #dba84a)', color: '#0c0c17', boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }} title="Add to entry">
             <Send className="w-5 h-5" />
           </button>
         ) : (
-          <button type="submit" disabled={disabled} className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer disabled:opacity-50" style={{ background: '#00a884', color: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }} title="Save entry">
+          <button type="submit" disabled={disabled} className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #c4913a, #dba84a)', color: '#0c0c17', boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }} title="Save entry">
             <Check className="w-5 h-5" />
           </button>
         )}
