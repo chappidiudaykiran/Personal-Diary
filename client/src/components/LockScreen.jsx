@@ -12,24 +12,18 @@ export default function LockScreen() {
   const [error, setError] = useState(false);
   const [unlocking, setUnlocking] = useState(false);
 
-  // Handle PIN input
+  // Functional updates so fast consecutive taps never drop a digit
+  // (each tap reads the latest PIN, not a stale render snapshot).
   const handleDigit = (digit) => {
-    if (pin.length < 4 && !unlocking) {
-      const nextPin = pin + digit;
-      setPin(nextPin);
-      setError(false);
-
-      if (nextPin.length === 4) {
-        verifyPin(nextPin);
-      }
-    }
+    if (unlocking) return;
+    setError(false);
+    setPin((prev) => (prev.length >= 4 ? prev : prev + digit));
   };
 
   const handleDelete = () => {
-    if (pin.length > 0 && !unlocking) {
-      setPin((prev) => prev.slice(0, -1));
-      setError(false);
-    }
+    if (unlocking) return;
+    setPin((prev) => prev.slice(0, -1));
+    setError(false);
   };
 
   const verifyPin = async (inputPin) => {
@@ -42,6 +36,15 @@ export default function LockScreen() {
       setUnlocking(false);
     }
   };
+
+  // Verify automatically once the 4th digit lands.
+  useEffect(() => {
+    if (pin.length === 4 && !unlocking) {
+      verifyPin(pin);
+    }
+    // verifyPin intentionally omitted — it only depends on the PIN value.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pin, unlocking]);
 
   // Keyboard support for desktop
   useEffect(() => {
@@ -171,6 +174,8 @@ export default function LockScreen() {
                 background: 'var(--bg-elevated)',
                 border: '1px solid var(--border-color)',
                 color: 'var(--text-primary)',
+                touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent',
               }}
             >
               {digit}
@@ -188,6 +193,8 @@ export default function LockScreen() {
               background: 'var(--bg-elevated)',
               border: '1px solid var(--border-color)',
               color: 'var(--text-primary)',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
             }}
           >
             0
@@ -200,6 +207,8 @@ export default function LockScreen() {
             style={{
               background: 'transparent',
               color: 'var(--text-muted)',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
             }}
           >
             <Delete className="w-6 h-6" />
