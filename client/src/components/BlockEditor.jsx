@@ -396,8 +396,8 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
       </div>
 
       {/* WhatsApp-style composer: message pill + attach + camera + round send/save.
-          Always visible (even while typing) — it is the typing surface. */}
-      <div className="sticky bottom-2 mt-3 z-10 flex items-center gap-2" style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+          Always visible — while typing it sits flush above the keyboard. */}
+      <div className={`sticky z-10 flex items-center gap-2 ${hideToolbar ? 'bottom-0 px-1 pb-1 pt-1' : 'bottom-2 mt-3'}`} style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)', background: hideToolbar ? 'var(--bg-app)' : 'transparent' }}>
         <div className="flex-1 flex items-center gap-0.5 rounded-full pl-4 pr-1.5 py-1" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', boxShadow: '0 -4px 16px rgba(0,0,0,0.12)' }}>
           <input
             ref={composerRef}

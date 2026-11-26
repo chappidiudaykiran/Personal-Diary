@@ -445,19 +445,6 @@ export default function NewEntry() {
               <BlockEditor blocks={blocks} onChange={setBlocks} cryptoKey={cryptoKey} disabled={saving} hideToolbar={keyboardOpen} />
             </div>
 
-            {/* Floating save while typing — footer is hidden so text stays visible */}
-            {keyboardOpen && (
-              <button
-                type="submit"
-                disabled={saving || !canSave}
-                className="absolute bottom-3 right-3 z-20 flex items-center gap-1.5 px-4 py-2.5 rounded-full text-sm font-semibold shadow-lg disabled:opacity-40 cursor-pointer"
-                style={{ background: 'linear-gradient(135deg, #c4913a, #dba84a)', color: '#0c0c17' }}
-              >
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                {saving ? 'Saving…' : 'Save'}
-              </button>
-            )}
-
             {/* Footer — hidden while typing so it never covers what you write */}
             {!keyboardOpen && (
             <div
