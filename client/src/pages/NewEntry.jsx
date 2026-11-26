@@ -330,8 +330,7 @@ export default function NewEntry() {
     }
   };
 
-  const isToday = entryDate === todayKey;
-  const dateLabel = isToday
+  const isToday = entryDate === todayKey;  const dateLabel = isToday
     ? new Date().toLocaleDateString('en-US', {
         weekday: 'long',
         month: 'long',
@@ -353,8 +352,9 @@ export default function NewEntry() {
       {/* Hidden while typing so the editor uses the full screen */}
       {!keyboardOpen && <Navbar />}
 
-      <main className="flex-1 min-h-0 w-full max-w-3xl mx-auto px-3 sm:px-6 py-3 sm:py-6 flex flex-col">
-        {/* Back */}
+      <main className={`flex-1 min-h-0 w-full mx-auto flex flex-col ${keyboardOpen ? 'px-0 py-0' : 'max-w-3xl px-3 sm:px-6 py-3 sm:py-6'}`}>
+        {/* Back — hidden while typing so text uses the full screen */}
+        {!keyboardOpen && (
         <button
           onClick={handleBack}
           className="flex items-center gap-1.5 text-sm mb-3 flex-shrink-0 self-start transition-colors cursor-pointer"
@@ -365,13 +365,14 @@ export default function NewEntry() {
           <ArrowLeft className="w-4 h-4" />
           Back to diary
         </button>
+        )}
 
         <form onSubmit={handleSave} className="flex-1 min-h-0 flex flex-col">
           <div
-            className="flex-1 min-h-0 flex flex-col rounded-2xl overflow-hidden fade-up shadow-sm relative"
+            className={`flex-1 min-h-0 flex flex-col overflow-hidden fade-up shadow-sm relative ${keyboardOpen ? '' : 'rounded-2xl'}`}
             style={{
               background: 'var(--panel-gradient)',
-              border: '1px solid var(--border-color)',
+              border: keyboardOpen ? 'none' : '1px solid var(--border-color)',
             }}
           >
             {/* Gold top accent */}
@@ -382,7 +383,7 @@ export default function NewEntry() {
 
             {/* Date header — tap the day picker to write for a past day */}
             <div
-              className="px-4 sm:px-8 pt-4 pb-3 flex-shrink-0 flex items-center gap-2 flex-wrap"
+              className={`${keyboardOpen ? 'px-3' : 'px-4 sm:px-8'} pt-4 pb-3 flex-shrink-0 flex items-center gap-2 flex-wrap`}
               style={{ borderBottom: '1px solid var(--border-color)' }}
             >
               <CalendarDays className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--gold)' }} />
@@ -425,7 +426,7 @@ export default function NewEntry() {
             </div>
 
             {/* Title input */}
-            <div className="px-4 sm:px-8 pt-4 pb-1 flex-shrink-0">
+            <div className={`${keyboardOpen ? 'px-3' : 'px-4 sm:px-8'} pt-4 pb-1 flex-shrink-0`}>
               <input
                 type="text"
                 value={title}
@@ -437,10 +438,10 @@ export default function NewEntry() {
               />
             </div>
 
-            <div className="mx-4 sm:mx-8 my-2 flex-shrink-0" style={{ height: '1px', background: 'var(--border-color)' }} />
+            <div className={`${keyboardOpen ? 'mx-3' : 'mx-4 sm:mx-8'} my-2 flex-shrink-0`} style={{ height: '1px', background: 'var(--border-color)' }} />
 
             {/* Writing area — only this part scrolls, and only when content is long */}
-            <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 pb-6 scroll-pb-32 sm:scroll-pb-28" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <div className={`flex-1 min-h-0 overflow-y-auto ${keyboardOpen ? 'px-3' : 'px-4 sm:px-8'} pb-6 scroll-pb-32 sm:scroll-pb-28`} style={{ WebkitOverflowScrolling: 'touch' }}>
               <BlockEditor blocks={blocks} onChange={setBlocks} cryptoKey={cryptoKey} disabled={saving} hideToolbar={keyboardOpen} />
             </div>
 
