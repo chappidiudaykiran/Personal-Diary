@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Paperclip,
   Camera,
-  Send,
   Check,
   Smile,
   X,
@@ -125,7 +124,6 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
   const fileInputRef = useRef(null);
   const composerRef = useRef(null);
   const cameraInputRef = useRef(null);
-  const [composer, setComposer] = useState('');
   const [showMoods, setShowMoods] = useState(false);
   const currentMood = MOODS.find((m) => m.value === mood) || null;
   const activeRef = useRef({ key: null, cursor: 0 });
@@ -225,24 +223,27 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
     onChange(next); focusBlock(tb.key);
   };
 
-  // WhatsApp-style composer: typed text is appended to the entry,
-  // attachments are inserted as media blocks.
-  const sendComposer = () => {
-    const text = composer.trim();
-    if (!text || disabled) return;
-    const list = tidyTextBlocks(blocks);
-    const last = list[list.length - 1];
+  // Tapping the Message bar jumps straight into the body text —
+  // the bar itself never holds typed text.
+  const focusBody = (e) => {
+    if (e) e.preventDefault();
+    try { composerRef.current?.blur(); } catch (_) {}
+    if (disabled) return;
+    let key = null;
+    const last = blocks[blocks.length - 1];
     if (last?.type === 'text') {
-      onChange([...list.slice(0, -1), { ...last, text: last.text ? `${last.text}\n${text}` : text }]);
+      key = last.key;
     } else {
-      onChange([...list, createTextBlock(text)]);
+      const tb = createTextBlock('');
+      key = tb.key;
+      onChange([...blocks, tb]);
     }
-    setComposer('');
-    // Stay in the composer for the next line, chat-style.
     setTimeout(() => {
-      try { composerRef.current?.focus({ preventScroll: true }); }
-      catch (_) { try { composerRef.current?.focus(); } catch (_) {} }
-    }, 0);
+      try {
+        const el = document.querySelector(`textarea[data-block-key="${key}"]`);
+        if (el) el.focus({ preventScroll: true });
+      } catch (_) {}
+    }, 60);
   };
 
   const removeBlock = (index) => {
@@ -426,10 +427,11 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
           </button>
           <input
             ref={composerRef}
-            value={composer}
+            value=""
             disabled={disabled}
-            onChange={(e) => setComposer(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendComposer(); } }}
+            readOnly
+            onFocus={focusBody}
+            onClick={focusBody}
             placeholder="Message"
             className="flex-1 min-w-0 bg-transparent outline-none text-sm sm:text-base py-2"
             style={{ color: 'var(--text-primary)' }}
@@ -442,11 +444,7 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
           </button>
         </div>
         </div>
-        {composer.trim() ? (
-          <button type="button" disabled={disabled} onClick={sendComposer} className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #c4913a, #dba84a)', color: '#0c0c17', boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }} title="Add to entry">
-            <Send className="w-5 h-5" />
-          </button>
-        ) : (
+        {(
           <button type="submit" disabled={disabled} className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #c4913a, #dba84a)', color: '#0c0c17', boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }} title="Save entry">
             <Check className="w-5 h-5" />
           </button>
