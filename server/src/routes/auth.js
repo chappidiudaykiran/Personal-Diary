@@ -7,7 +7,24 @@ const { body, validationResult } = require('express-validator');
 const { protect } = require('../middleware/auth');
 const User = require('../models/User');
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// Normalize email the same way express-validator's normalizeEmail() does on register.
+// In particular, Gmail ignores dots and +subaddress, and validator strips them
+// by default — so b.sailajanarayan17@gmail.com is stored as bsailajanarayan17@gmail.com.
+// Login must apply the same transform or the lookup misses.
+const normalizeEmailForLookup = (input) => {
+  const lower = (input || '').trim().toLowerCase();
+  const parts = lower.split('@');
+  if (parts.length !== 2 || !parts[0] || !parts[1]) return lower; // username, not an email
+  let [local, domain] = parts;
+  if (domain === 'googlemail.com') domain = 'gmail.com';
+  if (domain === 'gmail.com' || domain === 'google.com') {
+    local = local.split('+')[0].replace(/\./g, '');
+  } else {
+    // Match validator.js default: lowercase subaddress handling for other providers
+    // is off, so keep local part as-is (already lowercased).
+  }
+  return `${local}@${domain}`;
+};
 
 const generateTokens = (userId) => {
   const accessToken = jwt.sign({ id: userId }, process.env.JWT_SECRET, {
@@ -113,13 +130,18 @@ router.post(
 
     const { email, password } = req.body;
     const cleanIdentifier = (email || '').trim();
+    const normalizedEmail = normalizeEmailForLookup(cleanIdentifier);
+    const rawEmailLower = cleanIdentifier.toLowerCase();
 
     try {
-      // Find user by either email (case-insensitive) OR username (case-insensitive)
+      // Find user by either email (case-insensitive + Gmail dot-normalized to match
+      // register's normalizeEmail()) OR username (case-insensitive)
       const escapedIdentifier = cleanIdentifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const user = await User.findOne({
         $or: [
-          { email: cleanIdentifier.toLowerCase() },
+          { email: normalizedEmail },
+          // Fallback for accounts created before normalization / non-gmail variants
+          ...(normalizedEmail !== rawEmailLower ? [{ email: rawEmailLower }] : []),
           { username: new RegExp(`^${escapedIdentifier}$`, 'i') },
         ],
       }).select('+passwordHash +refreshTokens +encSalt');
