@@ -212,7 +212,14 @@ export default function NewEntry() {
   const handleDiscardDraft = useCallback(() => {
     clearDraft();
     clearDraftBlobs(draftKey).catch(() => {});
-  }, [clearDraft, draftKey]);
+    // Wipe the visible editor immediately — don't wait for a navigation
+    // round-trip to make the cleared draft apparent.
+    setTitle('');
+    setMood('');
+    setEntryDate(initialDateKey);
+    setBlocks(normalizeBlocks([createTextBlock('')]));
+    setMediaResolved(true);
+  }, [clearDraft, draftKey, initialDateKey]);
 
   const wordCount = countBlockWords(blocks);
   const charCount = blocksToPlainText(blocks).length;
