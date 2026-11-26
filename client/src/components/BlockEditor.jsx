@@ -402,8 +402,8 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
 
       {/* WhatsApp-style composer: message pill + attach + camera + round send/save.
           Always visible — while typing it sits flush above the keyboard. */}
-      <div className={`sticky z-10 flex items-center gap-2 ${hideToolbar ? 'bottom-0 px-1 pb-1 pt-1' : 'bottom-2 mt-3'}`} style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)', background: hideToolbar ? 'var(--bg-app)' : 'transparent' }}>
-        <div className="relative flex-1">
+      <div className={`sticky z-10 flex items-center gap-2 w-full max-w-full ${hideToolbar ? 'bottom-0 px-1 pb-1 pt-1' : 'bottom-2 mt-3'}`} style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)', background: hideToolbar ? 'var(--bg-app)' : 'transparent' }}>
+        <div className="relative flex-1 min-w-0">
           {showMoods && (
             <div className="absolute bottom-full left-0 mb-2 z-20 flex items-center gap-1 rounded-2xl px-2 py-1.5" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>
               {MOODS.map((m) => (
@@ -421,7 +421,7 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
               ))}
             </div>
           )}
-        <div className="flex-1 flex items-center gap-0.5 rounded-full pl-4 pr-1.5 py-1" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', boxShadow: '0 -4px 16px rgba(0,0,0,0.12)' }}>
+        <div className="flex-1 flex items-center gap-0.5 min-w-0 overflow-hidden rounded-full pl-3 pr-1.5 py-1" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', boxShadow: '0 -4px 16px rgba(0,0,0,0.12)' }}>
           <input
             ref={composerRef}
             value=""
@@ -436,10 +436,10 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
           <button type="button" disabled={disabled} onClick={() => setShowMoods((s) => !s)} className="p-2 rounded-full cursor-pointer disabled:opacity-40 flex-shrink-0" style={{ color: currentMood ? currentMood.color : 'var(--text-muted)' }} title="How are you feeling?">
             {currentMood ? <span className="text-xl leading-none">{currentMood.emoji}</span> : <Smile className="w-5 h-5" />}
           </button>
-          <button type="button" disabled={disabled} onClick={() => fileInputRef.current?.click()} className="p-2 rounded-full cursor-pointer disabled:opacity-40" style={{ color: 'var(--text-muted)' }} title="Attach photo, video or file">
+          <button type="button" disabled={disabled} onClick={() => fileInputRef.current?.click()} className="p-2 rounded-full cursor-pointer disabled:opacity-40 flex-shrink-0" style={{ color: 'var(--text-muted)' }} title="Attach photo, video or file">
             <Paperclip className="w-5 h-5" />
           </button>
-          <button type="button" disabled={disabled} onClick={() => cameraInputRef.current?.click()} className="p-2 rounded-full cursor-pointer disabled:opacity-40" style={{ color: 'var(--text-muted)' }} title="Take a photo">
+          <button type="button" disabled={disabled} onClick={() => cameraInputRef.current?.click()} className="p-2 rounded-full cursor-pointer disabled:opacity-40 flex-shrink-0" style={{ color: 'var(--text-muted)' }} title="Take a photo">
             <Camera className="w-5 h-5" />
           </button>
         </div>
