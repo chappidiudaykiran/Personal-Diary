@@ -281,7 +281,7 @@ export default function NewEntry() {
       }
       clearDraft();
       try { await clearDraftBlobs(draftKey); } catch (_) {}
-      navigate(`/entry/${entryId}`);
+      navigate('/dashboard');
     } catch (err) {
       const status = err?.response?.status;
       const serverMsg = friendlyServerError(
