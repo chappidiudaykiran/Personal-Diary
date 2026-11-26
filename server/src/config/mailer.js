@@ -34,7 +34,7 @@ async function sendResetCode(toEmail, code) {
       `Your password reset code is: ${code}\n\n` +
       `It expires in 10 minutes.\n` +
       `If you didn't request this, ignore this email.\n\n` +
-      `Note: resetting your password will permanently delete your old encrypted diary entries, because they can only be decrypted with the old password.`,
+      `Note: diary entries are encrypted with your old password, so entries written before the reset can't be opened with the new password.`,
   });
   return { delivered: true };
 }

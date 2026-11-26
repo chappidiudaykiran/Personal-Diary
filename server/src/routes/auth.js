@@ -6,8 +6,6 @@ const bcrypt = require('bcryptjs');
 const { body, validationResult } = require('express-validator');
 const { protect } = require('../middleware/auth');
 const User = require('../models/User');
-const Entry = require('../models/Entry');
-const Media = require('../models/Media');
 const { sendResetCode } = require('../config/mailer');
 
 // Normalize email the same way express-validator's normalizeEmail() does on register.
@@ -370,20 +368,17 @@ router.post(
       if (!valid) {
         return res.status(400).json({ message: 'Invalid or expired code' });
       }
-      // Set new password (pre-save hook bcrypt-hashes it), rotate encSalt so the
-      // new key can't decrypt old entries, clear sessions + reset OTP.
+      // Set new login password (pre-save hook bcrypt-hashes it).
+      // NOTE: encSalt is intentionally NOT rotated and entries are NOT deleted
+      // per user request. Trade-off: old entries stay stored but cannot be
+      // decrypted with the NEW password (key = PBKDF2(password, encSalt)).
+      // They will show as unreadable until opened with the old password.
       user.passwordHash = req.body.newPassword;
-      user.encSalt = crypto.randomBytes(32).toString('hex');
       user.resetPasswordCodeHash = null;
       user.resetPasswordExpires = null;
       user.refreshTokens = [];
       await user.save();
-      // Wipe old encrypted data — unreadable with the new password.
-      await Promise.all([
-        Entry.deleteMany({ userId: user._id }),
-        Media.deleteMany({ userId: user._id }),
-      ]);
-      return res.json({ message: 'Password reset successful. Your old encrypted entries were deleted.' });
+      return res.json({ message: 'Password reset successful. Old entries are kept but need the old password to open.' });
     } catch (error) {
       console.error('Reset-password error:', error);
       return res.status(500).json({ message: 'Server error, please try again' });

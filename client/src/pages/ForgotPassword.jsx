@@ -103,7 +103,7 @@ export default function ForgotPassword() {
         </p>
 
         <div className="text-xs py-2 px-3 rounded-lg mb-4" style={{ color: '#d4a24a', background: 'rgba(212,162,74,0.08)', border: '1px solid rgba(212,162,74,0.25)' }}>
-          Resetting creates a new encryption key — your old encrypted diary entries will be permanently deleted.
+          Your old entries are kept, but they were encrypted with your old password and can't be opened with the new one.
         </div>
 
         {step === 1 ? (
