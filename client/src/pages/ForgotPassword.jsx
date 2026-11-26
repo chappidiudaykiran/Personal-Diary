@@ -137,7 +137,7 @@ export default function ForgotPassword() {
               type="text"
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              placeholder="Number from your email"
+              placeholder="Enter the 6-digit code sent to your email"
               inputMode="numeric"
               className="w-full px-4 py-3 rounded-xl text-sm outline-none tracking-widest text-center"
               style={inputStyle}
