@@ -6,6 +6,9 @@ const bcrypt = require('bcryptjs');
 const { body, validationResult } = require('express-validator');
 const { protect } = require('../middleware/auth');
 const User = require('../models/User');
+const Entry = require('../models/Entry');
+const Media = require('../models/Media');
+const { sendResetCode } = require('../config/mailer');
 
 // Normalize email the same way express-validator's normalizeEmail() does on register.
 // In particular, Gmail ignores dots and +subaddress, and validator strips them
@@ -281,6 +284,105 @@ router.put(
     } catch (error) {
       console.error('Update profile error:', error);
       res.status(500).json({ message: 'Server error while updating profile' });
+    }
+  }
+);
+
+// ─── POST /api/auth/forgot-password ─────────────────────────────────────────
+// Sends a 6-digit OTP to the user's email. Always returns generic success
+// to avoid account enumeration.
+router.post(
+  '/forgot-password',
+  [body('email').notEmpty().withMessage('Email is required')],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ message: errors.array()[0].msg });
+    }
+    const normalizedEmail = normalizeEmailForLookup(req.body.email);
+    const rawEmailLower = (req.body.email || '').trim().toLowerCase();
+    try {
+      const user = await User.findOne({
+        $or: [{ email: normalizedEmail }, ...(normalizedEmail !== rawEmailLower ? [{ email: rawEmailLower }] : [])],
+      });
+      // Generic response even if user not found.
+      if (!user) {
+        return res.json({ message: 'If an account exists for this email, a reset code was sent.' });
+      }
+      const code = crypto.randomInt(100000, 1000000).toString();
+      const codeHash = crypto.createHash('sha256').update(code).digest('hex');
+      user.resetPasswordCodeHash = codeHash;
+      user.resetPasswordExpires = new Date(Date.now() + 10 * 60 * 1000);
+      await user.save({ validateBeforeSave: false });
+      try {
+        await sendResetCode(user.email, code);
+      } catch (mailErr) {
+        console.error('Reset email failed:', mailErr.message);
+        // Still return generic success; code is in logs only when SMTP missing.
+      }
+      return res.json({ message: 'If an account exists for this email, a reset code was sent.' });
+    } catch (error) {
+      console.error('Forgot-password error:', error);
+      return res.status(500).json({ message: 'Server error, please try again' });
+    }
+  }
+);
+
+// ─── POST /api/auth/reset-password ────────────────────────────────────────
+// Verifies OTP + sets a new password. Wipes encrypted diary data because the
+// encryption key is derived from the old password and cannot be recovered.
+router.post(
+  '/reset-password',
+  [
+    body('email').notEmpty().withMessage('Email is required'),
+    body('code').notEmpty().isLength({ min: 6, max: 6 }).withMessage('6-digit code required'),
+    body('newPassword').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ message: errors.array()[0].msg });
+    }
+    const normalizedEmail = normalizeEmailForLookup(req.body.email);
+    const rawEmailLower = (req.body.email || '').trim().toLowerCase();
+    const code = (req.body.code || '').trim();
+    try {
+      const user = await User.findOne({
+        $or: [{ email: normalizedEmail }, ...(normalizedEmail !== rawEmailLower ? [{ email: rawEmailLower }] : [])],
+      }).select('+resetPasswordCodeHash +resetPasswordExpires +refreshTokens');
+      if (!user || !user.resetPasswordCodeHash || !user.resetPasswordExpires) {
+        return res.status(400).json({ message: 'Invalid or expired code' });
+      }
+      if (user.resetPasswordExpires.getTime() < Date.now()) {
+        user.resetPasswordCodeHash = null;
+        user.resetPasswordExpires = null;
+        await user.save({ validateBeforeSave: false });
+        return res.status(400).json({ message: 'Code expired, request a new one' });
+      }
+      const incomingHash = crypto.createHash('sha256').update(code).digest('hex');
+      const a = Buffer.from(incomingHash, 'hex');
+      const b = Buffer.from(user.resetPasswordCodeHash, 'hex');
+      const valid = a.length === b.length && crypto.timingSafeEqual(a, b);
+      if (!valid) {
+        return res.status(400).json({ message: 'Invalid or expired code' });
+      }
+      // Set new password (pre-save hook bcrypt-hashes it), rotate encSalt so the
+      // new key can't decrypt old entries, clear sessions + reset OTP.
+      user.passwordHash = req.body.newPassword;
+      user.encSalt = crypto.randomBytes(32).toString('hex');
+      user.resetPasswordCodeHash = null;
+      user.resetPasswordExpires = null;
+      user.refreshTokens = [];
+      await user.save();
+      // Wipe old encrypted data — unreadable with the new password.
+      await Promise.all([
+        Entry.deleteMany({ userId: user._id }),
+        Media.deleteMany({ userId: user._id }),
+      ]);
+      return res.json({ message: 'Password reset successful. Your old encrypted entries were deleted.' });
+    } catch (error) {
+      console.error('Reset-password error:', error);
+      return res.status(500).json({ message: 'Server error, please try again' });
     }
   }
 );

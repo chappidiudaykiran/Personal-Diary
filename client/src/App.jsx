@@ -59,6 +59,7 @@ class RouteErrorBoundary extends Component {
 // Code-split routes so first load is small and repeat loads come from SW cache
 const Login = lazy(() => import('./pages/Login.jsx'));
 const Register = lazy(() => import('./pages/Register.jsx'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword.jsx'));
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const NewEntry = lazy(() => import('./pages/NewEntry.jsx'));
 const ViewEntry = lazy(() => import('./pages/ViewEntry.jsx'));
@@ -125,6 +126,7 @@ export default function App() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/login"    element={<PublicRoute><Login /></PublicRoute>} />
           <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+          <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
           <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
           <Route path="/entry/new" element={<PrivateRoute><NewEntry /></PrivateRoute>} />
           <Route path="/entry/:id" element={<PrivateRoute><ViewEntry /></PrivateRoute>} />

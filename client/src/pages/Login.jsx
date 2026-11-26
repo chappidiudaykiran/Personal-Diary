@@ -209,6 +209,12 @@ export default function Login() {
                 </p>
               )}
 
+              <div className="flex justify-end">
+                <Link to="/forgot-password" className="text-xs font-medium transition-colors" style={{ color: 'var(--gold)' }}>
+                  Forgot password?
+                </Link>
+              </div>
+
               <button
                 type="submit"
                 disabled={loading}

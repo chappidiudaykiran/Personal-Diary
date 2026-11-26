@@ -40,6 +40,18 @@ const userSchema = new mongoose.Schema(
         createdAt: { type: Date, default: Date.now },
       },
     ],
+    // Password-reset OTP (sha256 hash of the 6-digit code + expiry).
+    // Never store the raw code.
+    resetPasswordCodeHash: {
+      type: String,
+      default: null,
+      select: false,
+    },
+    resetPasswordExpires: {
+      type: Date,
+      default: null,
+      select: false,
+    },
   },
   {
     timestamps: true,
