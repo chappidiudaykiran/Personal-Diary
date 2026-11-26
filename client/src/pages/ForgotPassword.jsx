@@ -30,13 +30,13 @@ export default function ForgotPassword() {
         // Dev mode with no mail provider — show the code so testing works
         // without SMTP. Never happens in production.
         setCode(data.previewCode);
-        toast.success(`Dev mode: your reset code is ${data.previewCode}`, { duration: 8000 });
+        toast.success(`Dev mode: your verification number is ${data.previewCode}`, { duration: 8000 });
       } else if (data.delivered === false) {
-        toast.error('Reset code could not be emailed — mail service is not configured. Contact support.');
-        setError('Email service is not configured on the server, so the code was not sent. Please try again later.');
+        toast.error('Sorry, the email could not be sent. Please try again later.');
+        setError('Sorry, the email could not be sent right now. Please try again in a little while.');
         return;
       } else {
-        toast.success(data.message || 'Reset code sent');
+        toast.success('Email sent! Please check your inbox.');
       }
       setStep(2);
     } catch (err) {
@@ -51,11 +51,11 @@ export default function ForgotPassword() {
   const resetPassword = async (e) => {
     e.preventDefault();
     if (code.trim().length !== 6) {
-      setError('Enter the 6-digit code from your email.');
+      setError('Please enter the number we emailed you.');
       return;
     }
     if (newPassword.length < 8) {
-      setError('Password must be at least 8 characters.');
+      setError('Please choose a password with at least 8 characters.');
       return;
     }
     if (newPassword !== confirm) {
@@ -77,10 +77,10 @@ export default function ForgotPassword() {
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
       } catch (_) {}
-      toast.success(data.message || 'Password reset successful');
+      toast.success('Your password is updated! Please sign in.');
       navigate('/login');
     } catch (err) {
-      const msg = err.response?.data?.message || 'Reset failed. Check the code and try again.';
+      const msg = err.response?.data?.message || 'Something went wrong. Please check the number and try again.';
       setError(msg);
       toast.error(msg);
     } finally {
@@ -105,16 +105,16 @@ export default function ForgotPassword() {
         </div>
 
         <h1 className="font-display text-3xl mb-1" style={{ color: topInk, fontWeight: 400 }}>
-          {step === 1 ? 'Forgot password' : 'Enter reset code'}
+          {step === 1 ? 'Trouble signing in?' : 'Check your email'}
         </h1>
         <p className="text-sm mb-6" style={{ color: topMuted }}>
           {step === 1
-            ? 'Enter your account email and we will send a 6-digit reset code.'
-            : `Code sent to ${email.trim()}. It expires in 10 minutes.`}
+            ? 'Enter your account email and we will send you a short verification number.'
+            : `We have sent a verification number to ${email.trim()}. Please enter it below within 10 minutes.`}
         </p>
 
         <div className="text-xs py-2 px-3 rounded-lg mb-4" style={{ color: '#d4a24a', background: 'rgba(212,162,74,0.08)', border: '1px solid rgba(212,162,74,0.25)' }}>
-          Your old entries are kept, but they were encrypted with your old password and can't be opened with the new one.
+          Don&apos;t worry — your diary entries are safe and nothing will be deleted.
         </div>
 
         {step === 1 ? (
@@ -132,7 +132,7 @@ export default function ForgotPassword() {
             />
             {error && <p className="text-xs py-2 px-3 rounded-lg" style={{ color: '#e05555', background: 'rgba(224,85,85,0.08)', border: '1px solid rgba(224,85,85,0.2)' }}>{error}</p>}
             <button type="submit" disabled={loading} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold cursor-pointer disabled:opacity-60" style={{ background: 'linear-gradient(135deg, #c4913a, #dba84a)', color: '#0c0c17' }}>
-              {loading ? 'Sending…' : (<>Send reset code <ArrowRight className="w-4 h-4" /></>)}
+              {loading ? 'Sending email…' : (<>Send email <ArrowRight className="w-4 h-4" /></>)}
             </button>
           </form>
         ) : (
@@ -141,7 +141,7 @@ export default function ForgotPassword() {
               type="text"
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              placeholder="6-digit code"
+              placeholder="Number from your email"
               inputMode="numeric"
               className="w-full px-4 py-3 rounded-xl text-sm outline-none tracking-widest text-center"
               style={inputStyle}
@@ -150,7 +150,7 @@ export default function ForgotPassword() {
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="New password (min 8 chars)"
+              placeholder="Choose a new password"
               autoComplete="new-password"
               className="w-full px-4 py-3 rounded-xl text-sm outline-none"
               style={inputStyle}
@@ -166,10 +166,10 @@ export default function ForgotPassword() {
             />
             {error && <p className="text-xs py-2 px-3 rounded-lg" style={{ color: '#e05555', background: 'rgba(224,85,85,0.08)', border: '1px solid rgba(224,85,85,0.2)' }}>{error}</p>}
             <button type="submit" disabled={loading} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold cursor-pointer disabled:opacity-60" style={{ background: 'linear-gradient(135deg, #c4913a, #dba84a)', color: '#0c0c17' }}>
-              {loading ? 'Resetting…' : (<>Reset password <ArrowRight className="w-4 h-4" /></>)}
+              {loading ? 'Saving…' : (<>Save new password <ArrowRight className="w-4 h-4" /></>)}
             </button>
             <button type="button" onClick={() => setStep(1)} className="w-full text-xs py-2 cursor-pointer" style={{ color: topMuted }}>
-              Didn't get the code? Try a different email
+              Didn&apos;t get the email? Check spam or try again
             </button>
           </form>
         )}
