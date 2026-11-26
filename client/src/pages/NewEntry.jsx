@@ -350,7 +350,8 @@ export default function NewEntry() {
 
   return (
     <div className="h-dvh flex flex-col overflow-hidden transition-colors duration-200" style={{ background: 'var(--bg-app)' }}>
-      <Navbar />
+      {/* Hidden while typing so the editor uses the full screen */}
+      {!keyboardOpen && <Navbar />}
 
       <main className="flex-1 min-h-0 w-full max-w-3xl mx-auto px-3 sm:px-6 py-3 sm:py-6 flex flex-col">
         {/* Back */}
