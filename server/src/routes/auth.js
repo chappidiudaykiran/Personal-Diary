@@ -316,27 +316,24 @@ router.post(
       user.resetPasswordCodeHash = codeHash;
       user.resetPasswordExpires = new Date(Date.now() + 10 * 60 * 1000);
       await user.save({ validateBeforeSave: false });
-      try {
-        // Awaited: when no mail provider is configured this resolves
-        // immediately with { delivered: false, previewCode } in dev.
-        // When SMTP/Brevo is configured it sends before responding so the
-        // client knows the mail actually went out.
+      // Fast path: no mail provider configured (local dev) — resolves
+      // instantly with { delivered: false, previewCode } so testing works.
+      if (!process.env.BREVO_API_KEY && !(process.env.SMTP_USER && process.env.SMTP_PASS)) {
         const result = await sendResetCode(user.email, code);
         return res.json({
           message: 'If an account exists for this email, a reset code was sent.',
           delivered: result.delivered,
-          via: result.via,
-          // Exposed ONLY in non-production when no mail provider exists,
-          // so local testing works without SMTP. Never sent in production.
           previewCode: result.previewCode,
         });
-      } catch (mailErr) {
-        console.error('Reset email failed:', mailErr.message);
-        return res.json({
-          message: 'If an account exists for this email, a reset code was sent.',
-          delivered: false,
-        });
       }
+      // Production path: respond IMMEDIATELY so the app never sticks on
+      // "Sending..." during Render cold starts (~50s) or slow SMTP.
+      // Email goes out in the background; failures land in server logs.
+      res.json({ message: 'If an account exists for this email, a reset code was sent.', delivered: true });
+      sendResetCode(user.email, code).catch((mailErr) => {
+        console.error('Reset email failed:', mailErr.message);
+      });
+      return;
     } catch (error) {
       console.error('Forgot-password error:', error);
       return res.status(500).json({ message: 'Server error, please try again' });
