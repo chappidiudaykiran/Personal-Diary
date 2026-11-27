@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import {
   Paperclip,
   Camera,
@@ -22,6 +22,8 @@ import {
 } from '../api/mediaApi.js';
 import { InlineMedia } from './InlineMedia.jsx';
 import { MOODS } from './MoodPicker.jsx';
+import AttachSheet from './AttachSheet.jsx';
+import DrawingPad from './DrawingPad.jsx';
 import { createTextBlock, createMediaBlock, clampAsideWidth } from '../utils/entryBlocks.js';
 
 function AutoTextarea({ blockKey, value, onChange, onCursor, placeholder, disabled, first }) {
@@ -120,11 +122,13 @@ function AsideFilePreview({ file }) {
   );
 }
 
-export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = false, hideToolbar = false, mood = '', onMoodChange = null }) {
+const BlockEditor = forwardRef(function BlockEditor({ blocks, onChange, cryptoKey, disabled = false, hideToolbar = false, mood = '', onMoodChange = null }, ref) {
   const fileInputRef = useRef(null);
   const composerRef = useRef(null);
   const cameraInputRef = useRef(null);
   const [showMoods, setShowMoods] = useState(false);
+  const [showAttach, setShowAttach] = useState(false);
+  const [showDraw, setShowDraw] = useState(false);
   const currentMood = MOODS.find((m) => m.value === mood) || null;
   const activeRef = useRef({ key: null, cursor: 0 });
   const focusKeyRef = useRef(null);
@@ -245,6 +249,12 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
       } catch (_) {}
     }, 60);
   };
+
+  // Opened from the top-bar + (attach menu) and book (drawing) buttons.
+  useImperativeHandle(ref, () => ({
+    openAttachSheet: () => setShowAttach(true),
+    openDrawing: () => setShowDraw(true),
+  }), []);
 
   const removeBlock = (index) => {
     const next = [...blocks]; next.splice(index, 1);
@@ -452,6 +462,10 @@ export default function BlockEditor({ blocks, onChange, cryptoKey, disabled = fa
       </div>
       <input ref={fileInputRef} type="file" multiple accept={MEDIA_ACCEPT} className="hidden" onChange={(e) => { insertFiles(e.target.files); e.target.value = ''; }} />
       <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { insertFiles(e.target.files); e.target.value = ''; }} />
+      <AttachSheet open={showAttach} onClose={() => setShowAttach(false)} onFiles={(files) => insertFiles(files)} />
+      <DrawingPad open={showDraw} onClose={() => setShowDraw(false)} onSave={(file) => insertFiles([file])} />
     </div>
   );
-}
+});
+
+export default BlockEditor;

@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Pencil, Trash2, X, Loader2 } from 'lucide-react';
+import { Pencil, Trash2, Loader2, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { moodMap } from '../components/MoodPicker.jsx';
+import EditorTopBar from '../components/EditorTopBar.jsx';
 import BlockEditor from '../components/BlockEditor.jsx';
 import EntryContent from '../components/InlineMedia.jsx';
 import { uploadMediaFile, listMedia, deleteMedia } from '../api/mediaApi.js';
@@ -61,6 +62,7 @@ export default function ViewEntry() {
   const [uploadStatus, setUploadStatus] = useState('');
   const titleRef = useRef(null);
   const [titleError, setTitleError] = useState(false);
+  const editorRef = useRef(null);
   // Hide footer + toolbar while typing so text stays clearly visible
   const keyboardOpen = useKeyboardOpen();
   const { topInk, topMuted } = useWallpaper();
@@ -276,6 +278,13 @@ export default function ViewEntry() {
     setEditing(false);
   };
 
+  const focusTitle = () => {
+    try { titleRef.current?.focus({ preventScroll: true }); } catch (_) { try { titleRef.current?.focus(); } catch (_) {} }
+    setTimeout(() => {
+      try { titleRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) {}
+    }, 100);
+  };
+
   // ─── Loading skeleton ──────────────────────────────────────────────────────
   if (loading) {
     return (
@@ -315,7 +324,19 @@ export default function ViewEntry() {
             style={{ background: 'linear-gradient(90deg, transparent, var(--gold), transparent)' }}
           />
 
-          {/* Date header + actions */}
+          {/* Date header (reading) / top bar (editing) */}
+          {editing ? (
+            <EditorTopBar
+              title={title}
+              onBack={handleCancelEdit}
+              onTitleClick={focusTitle}
+              onPlus={() => editorRef.current?.openAttachSheet()}
+              onBook={() => editorRef.current?.openDrawing()}
+              menuItems={[
+                { key: 'save', label: 'Save changes', icon: Save, onClick: () => handleSave() },
+              ]}
+            />
+          ) : (
           <div
             className="px-3 pt-4 pb-3 flex-shrink-0 flex items-center gap-2 flex-wrap"
             style={{ borderBottom: '1px solid var(--border-color)' }}
@@ -323,7 +344,7 @@ export default function ViewEntry() {
             <span className="text-[11px] sm:text-xs uppercase tracking-widest font-medium" style={{ color: topMuted }}>
               {formatDate(createdAtDate)} · {formatTime(createdAtDate)}
             </span>
-            {!editing && currentMood && (
+            {currentMood && (
               <span
                 className="flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full"
                 style={{
@@ -335,20 +356,8 @@ export default function ViewEntry() {
                 {currentMood.emoji} {currentMood.label}
               </span>
             )}
-            <div className="ml-auto flex items-center gap-1 flex-shrink-0">
-              {editing && (
-                <button
-                  type="button"
-                  onClick={handleCancelEdit}
-                  className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg transition-all cursor-pointer"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  <X className="w-3.5 h-3.5" />
-                  Cancel
-                </button>
-              )}
-            </div>
           </div>
+          )}
 
           {/* Upload progress — only shows while photos are saving */}
           {uploadStatus && (
@@ -390,7 +399,7 @@ export default function ViewEntry() {
             <div className="my-2" style={{ height: '1px', background: 'var(--border-color)' }} />
 
             {editing ? (
-              <BlockEditor blocks={blocks} onChange={setBlocks} cryptoKey={cryptoKey} disabled={saving} hideToolbar={keyboardOpen} mood={mood} onMoodChange={setMood} />
+              <BlockEditor ref={editorRef} blocks={blocks} onChange={setBlocks} cryptoKey={cryptoKey} disabled={saving} hideToolbar={keyboardOpen} mood={mood} onMoodChange={setMood} />
             ) : (
               <EntryContent blocks={blocks} cryptoKey={cryptoKey} metas={mediaMetas} />
             )}

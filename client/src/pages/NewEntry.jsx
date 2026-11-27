@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Loader2, CalendarDays } from 'lucide-react';
+import { Loader2, CalendarDays, Save, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import BlockEditor from '../components/BlockEditor.jsx';
+import EditorTopBar from '../components/EditorTopBar.jsx';
 import { uploadMediaFile } from '../api/mediaApi.js';
 import apiClient from '../api/apiClient.js';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -67,6 +68,7 @@ export default function NewEntry() {
   const [mood, setMood] = useState(initialDraft?.mood || '');
   const titleRef = useRef(null);
   const [titleError, setTitleError] = useState(false);
+  const editorRef = useRef(null);
   // The diary day this entry belongs to — defaults to today, but any past
   // day can be picked to backfill a missed day.
   const [entryDate, setEntryDate] = useState(() =>
@@ -219,7 +221,7 @@ export default function NewEntry() {
   };
 
   const handleSave = async (e) => {
-    e.preventDefault();
+    e?.preventDefault?.();
     if (!cryptoKey) {
       toast.error('You were signed out. Please sign in again to open your diary.');
       return;
@@ -313,9 +315,36 @@ export default function NewEntry() {
     }
   };
 
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/dashboard');
+    }
+  };
+
+  const focusTitle = () => {
+    try { titleRef.current?.focus({ preventScroll: true }); } catch (_) { try { titleRef.current?.focus(); } catch (_) {} }
+    setTimeout(() => {
+      try { titleRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) {}
+    }, 100);
+  };
+
+  const hasDraftContent = Boolean(title.trim() || draftContent.trim() || mood);
+
+  const handleDiscardDraft = () => {
+    clearDraft();
+    clearDraftBlobs(draftKey).catch(() => {});
+    setTitle('');
+    setMood('');
+    setEntryDate(initialDateKey);
+    setBlocks(normalizeBlocks([createTextBlock('')]));
+    setMediaResolved(true);
+    toast('Draft cleared', { icon: '🗑️' });
+  };
+
   const isToday = entryDate === todayKey;
-  const dateLabel = isToday
-    ? new Date().toLocaleDateString('en-US', {
+  const dateLabel = isToday    ? new Date().toLocaleDateString('en-US', {
         weekday: 'long',
         month: 'long',
         day: 'numeric',
@@ -325,6 +354,19 @@ export default function NewEntry() {
 
   return (
     <div className="h-dvh flex flex-col overflow-hidden transition-colors duration-200" style={{ background: 'var(--bg-app)' }}>
+      <EditorTopBar
+        title={title}
+        onBack={handleBack}
+        onTitleClick={focusTitle}
+        onPlus={() => editorRef.current?.openAttachSheet()}
+        onBook={() => editorRef.current?.openDrawing()}
+        menuItems={[
+          { key: 'save', label: 'Save entry', icon: Save, onClick: () => handleSave() },
+          ...(hasDraftContent
+            ? [{ key: 'discard', label: 'Discard draft', icon: Trash2, danger: true, onClick: handleDiscardDraft }]
+            : []),
+        ]}
+      />
       <main className="flex-1 min-h-0 w-full mx-auto flex flex-col px-0 py-0">
 
         <form onSubmit={handleSave} className="flex-1 min-h-0 flex flex-col">
@@ -408,7 +450,7 @@ export default function NewEntry() {
 
               <div className="my-2" style={{ height: '1px', background: 'var(--border-color)' }} />
 
-              <BlockEditor blocks={blocks} onChange={setBlocks} cryptoKey={cryptoKey} disabled={saving} hideToolbar={keyboardOpen} mood={mood} onMoodChange={setMood} />
+              <BlockEditor ref={editorRef} blocks={blocks} onChange={setBlocks} cryptoKey={cryptoKey} disabled={saving} hideToolbar={keyboardOpen} mood={mood} onMoodChange={setMood} />
             </div>
 
             {/* Upload progress — only shows while photos are saving */}
