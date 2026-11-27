@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { FileText, Mic, Image as ImageIcon, Camera, FileAudio, Square, X } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 /**
  * Bottom attach menu (Image / Camera / Voice recording / Audio file / PDF).
@@ -32,7 +33,11 @@ export default function AttachSheet({ open, onClose, onFiles }) {
   }, []);
 
   const startRecording = async () => {
-    if (recording || !window.MediaRecorder) return;
+    if (recording) return;
+    if (!window.MediaRecorder || !navigator.mediaDevices?.getUserMedia) {
+      toast.error('Voice recording is not supported on this device or browser.');
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
@@ -51,8 +56,10 @@ export default function AttachSheet({ open, onClose, onFiles }) {
         setRecSeconds(0);
         if (blob.size > 0) {
           const ext = (rec.mimeType || '').includes('mp4') ? 'm4a' : 'webm';
-          onFiles([new File([blob], `voice-note.${ext}`, { type: blob.type })]);
+          onFiles([new File([blob], `voice-note.${ext}`, { type: blob.type || 'audio/webm' })]);
           onClose();
+        } else {
+          toast.error('Recording was empty — nothing attached.');
         }
       };
       rec.start();
@@ -61,6 +68,7 @@ export default function AttachSheet({ open, onClose, onFiles }) {
       timerRef.current = setInterval(() => setRecSeconds((s) => s + 1), 1000);
     } catch (_) {
       stopTracks();
+      toast.error('Microphone blocked — allow microphone access and try again.');
     }
   };
 

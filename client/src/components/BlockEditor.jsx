@@ -95,7 +95,7 @@ function AsideFilePreview({ file }) {
   const [url, setUrl] = useState(null);
   const kind = kindFromMime(file.type, file.name);
   useEffect(() => {
-    if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
+    if (file.type.startsWith('image/') || file.type.startsWith('video/') || file.type.startsWith('audio/')) {
       const objectUrl = URL.createObjectURL(file);
       setUrl(objectUrl);
       return () => URL.revokeObjectURL(objectUrl);
@@ -107,6 +107,17 @@ function AsideFilePreview({ file }) {
   }
   if (kind === 'video' && url) {
     return <video src={url} controls playsInline className="w-full rounded-xl block" style={{ maxHeight: '65vh', background: '#000', border: '1px solid var(--border-color)' }} />;
+  }
+  if (kind === 'audio' && url) {
+    return (
+      <div className="flex flex-col gap-1 rounded-xl px-3 py-2 w-full" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)' }}>
+        <div className="flex items-center gap-2">
+          <FileAudio className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--gold)' }} />
+          <span className="text-xs truncate flex-1" style={{ color: 'var(--text-muted)' }}>{file.name}</span>
+        </div>
+        <audio controls src={url} preload="metadata" className="w-full h-8" />
+      </div>
+    );
   }
   return (
     <div className="flex items-center gap-2 rounded-xl px-3 py-2 w-full" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)' }}>
@@ -193,6 +204,13 @@ const BlockEditor = forwardRef(function BlockEditor({ blocks, onChange, cryptoKe
     const next = [...blocks.slice(0, index), before, ...mediaBlocks, after, ...blocks.slice(index + 1)];
     onChange(next); focusBlock(after.key);
     if (mediaBlocks[0]) setSelectedKey(mediaBlocks[0].key);
+    const firstKey = mediaBlocks.length > 0 ? mediaBlocks[0].key : null;
+    if (firstKey) {
+      const elId = 'media-box-' + firstKey;
+      setTimeout(() => {
+        try { document.getElementById(elId)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) {}
+      }, 120);
+    }
   };
 
   const insertTextBlock = () => {    const tidied = tidyTextBlocks(blocks);
