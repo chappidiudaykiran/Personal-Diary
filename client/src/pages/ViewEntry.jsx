@@ -332,6 +332,8 @@ export default function ViewEntry() {
               onTitleClick={focusTitle}
               onPlus={() => editorRef.current?.openAttachSheet()}
               onBook={() => editorRef.current?.openDrawing()}
+              mood={mood}
+              onMoodChange={setMood}
               menuItems={[
                 { key: 'save', label: 'Save changes', icon: Save, onClick: () => handleSave() },
               ]}
@@ -399,7 +401,7 @@ export default function ViewEntry() {
             <div className="my-2" style={{ height: '1px', background: 'var(--border-color)' }} />
 
             {editing ? (
-              <BlockEditor ref={editorRef} blocks={blocks} onChange={setBlocks} cryptoKey={cryptoKey} disabled={saving} hideToolbar={keyboardOpen} mood={mood} onMoodChange={setMood} />
+              <BlockEditor ref={editorRef} blocks={blocks} onChange={setBlocks} cryptoKey={cryptoKey} disabled={saving} />
             ) : (
               <EntryContent blocks={blocks} cryptoKey={cryptoKey} metas={mediaMetas} />
             )}

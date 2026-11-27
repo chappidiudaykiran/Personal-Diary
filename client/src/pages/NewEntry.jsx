@@ -360,6 +360,8 @@ export default function NewEntry() {
         onTitleClick={focusTitle}
         onPlus={() => editorRef.current?.openAttachSheet()}
         onBook={() => editorRef.current?.openDrawing()}
+        mood={mood}
+        onMoodChange={setMood}
         menuItems={[
           { key: 'save', label: 'Save entry', icon: Save, onClick: () => handleSave() },
           ...(hasDraftContent
@@ -450,7 +452,7 @@ export default function NewEntry() {
 
               <div className="my-2" style={{ height: '1px', background: 'var(--border-color)' }} />
 
-              <BlockEditor ref={editorRef} blocks={blocks} onChange={setBlocks} cryptoKey={cryptoKey} disabled={saving} hideToolbar={keyboardOpen} mood={mood} onMoodChange={setMood} />
+              <BlockEditor ref={editorRef} blocks={blocks} onChange={setBlocks} cryptoKey={cryptoKey} disabled={saving} />
             </div>
 
             {/* Upload progress — only shows while photos are saving */}

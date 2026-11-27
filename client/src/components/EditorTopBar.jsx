@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { ChevronLeft, BookOpen, Plus, MoreVertical } from 'lucide-react';
+import { ChevronLeft, BookOpen, Plus, MoreVertical, Smile } from 'lucide-react';
+import { MOODS } from './MoodPicker.jsx';
 
 /**
- * Notes-app style top bar: back · title · book (drawing) · + (attach) · menu.
+ * Notes-app style top bar: back · title · mood · book (drawing) · + (attach) · menu.
  */
 export default function EditorTopBar({
   title,
@@ -11,8 +12,12 @@ export default function EditorTopBar({
   onPlus,
   onBook,
   menuItems = [],
+  mood = '',
+  onMoodChange = null,
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [moodsOpen, setMoodsOpen] = useState(false);
+  const currentMood = MOODS.find((m) => m.value === mood) || null;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -51,6 +56,40 @@ export default function EditorTopBar({
         {title || 'Title'}
       </button>
 
+      <div className="relative flex-shrink-0">
+        <button
+          type="button"
+          onClick={() => { setMoodsOpen((s) => !s); setMenuOpen(false); }}
+          className="p-2.5 rounded-full cursor-pointer"
+          style={{ color: currentMood ? currentMood.color : 'var(--text-primary)' }}
+          title="How are you feeling?"
+        >
+          {currentMood ? <span className="text-xl leading-none">{currentMood.emoji}</span> : <Smile className="w-5 h-5" />}
+        </button>
+        {moodsOpen && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setMoodsOpen(false)} />
+            <div
+              className="absolute right-0 top-full mt-1 z-50 flex items-center gap-1 rounded-2xl px-2 py-1.5"
+              style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', boxShadow: '0 12px 32px rgba(0,0,0,0.35)' }}
+            >
+              {MOODS.map((m) => (
+                <button
+                  key={m.value}
+                  type="button"
+                  title={m.label}
+                  onClick={() => { onMoodChange?.(mood === m.value ? '' : m.value); setMoodsOpen(false); }}
+                  className="w-9 h-9 rounded-full flex items-center justify-center text-xl cursor-pointer"
+                  style={mood === m.value ? { background: `${m.color}30`, border: `1px solid ${m.color}` } : { border: '1px solid transparent' }}
+                >
+                  {m.emoji}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
       <button
         type="button"
         onClick={onBook}
@@ -75,7 +114,7 @@ export default function EditorTopBar({
         <div className="relative flex-shrink-0">
           <button
             type="button"
-            onClick={() => setMenuOpen((s) => !s)}
+            onClick={() => { setMenuOpen((s) => !s); setMoodsOpen(false); }}
             className="p-2.5 rounded-full cursor-pointer"
             style={{ color: 'var(--text-primary)' }}
             title="More options"

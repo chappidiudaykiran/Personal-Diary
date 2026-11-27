@@ -1,9 +1,5 @@
 import React, { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import {
-  Paperclip,
-  Camera,
-  Check,
-  Smile,
   X,
   ChevronUp,
   ChevronDown,
@@ -13,7 +9,6 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
-  MEDIA_ACCEPT,
   MAX_FILE_BYTES,
   MAX_FILES_PER_ENTRY,
   isSupportedFile,
@@ -21,7 +16,6 @@ import {
   formatFileSize,
 } from '../api/mediaApi.js';
 import { InlineMedia } from './InlineMedia.jsx';
-import { MOODS } from './MoodPicker.jsx';
 import AttachSheet from './AttachSheet.jsx';
 import DrawingPad from './DrawingPad.jsx';
 import { createTextBlock, createMediaBlock, clampAsideWidth } from '../utils/entryBlocks.js';
@@ -122,14 +116,9 @@ function AsideFilePreview({ file }) {
   );
 }
 
-const BlockEditor = forwardRef(function BlockEditor({ blocks, onChange, cryptoKey, disabled = false, hideToolbar = false, mood = '', onMoodChange = null }, ref) {
-  const fileInputRef = useRef(null);
-  const composerRef = useRef(null);
-  const cameraInputRef = useRef(null);
-  const [showMoods, setShowMoods] = useState(false);
+const BlockEditor = forwardRef(function BlockEditor({ blocks, onChange, cryptoKey, disabled = false }, ref) {
   const [showAttach, setShowAttach] = useState(false);
   const [showDraw, setShowDraw] = useState(false);
-  const currentMood = MOODS.find((m) => m.value === mood) || null;
   const activeRef = useRef({ key: null, cursor: 0 });
   const focusKeyRef = useRef(null);
   const [, setFocusTick] = useState(0);
@@ -225,29 +214,6 @@ const BlockEditor = forwardRef(function BlockEditor({ blocks, onChange, cryptoKe
     }
     const tb = createTextBlock(''); const next = [...list.slice(0, index + 1), tb, ...list.slice(index + 1)];
     onChange(next); focusBlock(tb.key);
-  };
-
-  // Tapping the Message bar jumps straight into the body text —
-  // the bar itself never holds typed text.
-  const focusBody = (e) => {
-    if (e) e.preventDefault();
-    try { composerRef.current?.blur(); } catch (_) {}
-    if (disabled) return;
-    let key = null;
-    const last = blocks[blocks.length - 1];
-    if (last?.type === 'text') {
-      key = last.key;
-    } else {
-      const tb = createTextBlock('');
-      key = tb.key;
-      onChange([...blocks, tb]);
-    }
-    setTimeout(() => {
-      try {
-        const el = document.querySelector(`textarea[data-block-key="${key}"]`);
-        if (el) el.focus({ preventScroll: true });
-      } catch (_) {}
-    }, 60);
   };
 
   // Opened from the top-bar + (attach menu) and book (drawing) buttons.
@@ -405,63 +371,9 @@ const BlockEditor = forwardRef(function BlockEditor({ blocks, onChange, cryptoKe
     <div className="flex flex-col min-h-full">
       <div className="flex-1">
         {rendered}
-        {/* Spacer so the last line can scroll above the sticky Media bar.
-            Always rendered so hiding the toolbar doesn't shift layout / hide text. */}
-        <div className="h-24 sm:h-20" aria-hidden="true" />
+        <div className="h-4" aria-hidden="true" />
       </div>
 
-      {/* WhatsApp-style composer: message pill + attach + camera + round send/save.
-          Always visible — while typing it sits flush above the keyboard. */}
-      <div className={`sticky z-10 flex items-center gap-2 w-full max-w-full ${hideToolbar ? 'bottom-0 px-1 pb-1 pt-1' : 'bottom-2 mt-3'}`} style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)', background: hideToolbar ? 'var(--bg-app)' : 'transparent' }}>
-        <div className="relative flex-1 min-w-0">
-          {showMoods && (
-            <div className="absolute bottom-full left-0 mb-2 z-20 flex items-center gap-1 rounded-2xl px-2 py-1.5" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>
-              {MOODS.map((m) => (
-                <button
-                  key={m.value}
-                  type="button"
-                  disabled={disabled}
-                  title={m.label}
-                  onClick={() => { onMoodChange?.(mood === m.value ? '' : m.value); setShowMoods(false); }}
-                  className="w-9 h-9 rounded-full flex items-center justify-center text-xl cursor-pointer disabled:opacity-40"
-                  style={mood === m.value ? { background: `${m.color}30`, border: `1px solid ${m.color}` } : { border: '1px solid transparent' }}
-                >
-                  {m.emoji}
-                </button>
-              ))}
-            </div>
-          )}
-        <div className="flex-1 flex items-center gap-0.5 min-w-0 overflow-hidden rounded-full pl-3 pr-1.5 py-1" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', boxShadow: '0 -4px 16px rgba(0,0,0,0.12)' }}>
-          <input
-            ref={composerRef}
-            value=""
-            disabled={disabled}
-            readOnly
-            onFocus={focusBody}
-            onClick={focusBody}
-            placeholder="Message"
-            className="flex-1 min-w-0 bg-transparent outline-none text-sm sm:text-base py-2"
-            style={{ color: 'var(--text-primary)' }}
-          />
-          <button type="button" disabled={disabled} onClick={() => setShowMoods((s) => !s)} className="p-2 rounded-full cursor-pointer disabled:opacity-40 flex-shrink-0" style={{ color: currentMood ? currentMood.color : 'var(--text-muted)' }} title="How are you feeling?">
-            {currentMood ? <span className="text-xl leading-none">{currentMood.emoji}</span> : <Smile className="w-5 h-5" />}
-          </button>
-          <button type="button" disabled={disabled} onClick={() => fileInputRef.current?.click()} className="p-2 rounded-full cursor-pointer disabled:opacity-40 flex-shrink-0" style={{ color: 'var(--text-muted)' }} title="Attach photo, video or file">
-            <Paperclip className="w-5 h-5" />
-          </button>
-          <button type="button" disabled={disabled} onClick={() => cameraInputRef.current?.click()} className="p-2 rounded-full cursor-pointer disabled:opacity-40 flex-shrink-0" style={{ color: 'var(--text-muted)' }} title="Take a photo">
-            <Camera className="w-5 h-5" />
-          </button>
-        </div>
-        </div>
-        {(
-          <button type="submit" disabled={disabled} className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #c4913a, #dba84a)', color: '#0c0c17', boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }} title="Save entry">
-            <Check className="w-5 h-5" />
-          </button>
-        )}
-      </div>
-      <input ref={fileInputRef} type="file" multiple accept={MEDIA_ACCEPT} className="hidden" onChange={(e) => { insertFiles(e.target.files); e.target.value = ''; }} />
-      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { insertFiles(e.target.files); e.target.value = ''; }} />
       <AttachSheet open={showAttach} onClose={() => setShowAttach(false)} onFiles={(files) => insertFiles(files)} />
       <DrawingPad open={showDraw} onClose={() => setShowDraw(false)} onSave={(file) => insertFiles([file])} />
     </div>
