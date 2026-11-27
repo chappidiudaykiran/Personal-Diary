@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { X, Undo2, Trash2, Check, Pen, Eraser, Minus, Plus } from 'lucide-react';
+import { X, Undo2, Trash2, Check, Pen, Eraser, Minus, Plus, Hand } from 'lucide-react';
 
 const COLORS = ['#ffffff', '#ffd166', '#ef476f', '#06d6a0', '#4cc9f0', '#c4913a'];
 const MIN_W = 1;
@@ -20,11 +20,16 @@ export default function DrawingPad({ open, onClose, onSave }) {
   const currentRef = useRef(null);
   const scaleRef = useRef({ x: 1, y: 1 });
   const [tool, setTool] = useState('pen');
+  const [mode, setMode] = useState('draw'); // 'draw' | 'scroll'
   const [color, setColor] = useState(COLORS[0]);
   const [width, setWidth] = useState(6);
   const [strokeCount, setStrokeCount] = useState(0);
   const settingsRef = useRef({ tool: 'pen', color: COLORS[0], width: 6 });
   settingsRef.current = { tool, color, width };
+
+  // Tall scrollable page (2.5 screens). Points are rescaled on resize so the
+  // drawing survives rotation without shifting.
+  const PAGE_FACTOR = 2.5;
 
   // Size the canvas to its container. Points are rescaled so the
   // drawing survives rotation/resize without shifting.
@@ -34,7 +39,7 @@ export default function DrawingPad({ open, onClose, onSave }) {
     if (!canvas || !wrap) return;
     const dpr = window.devicePixelRatio || 1;
     const w = Math.max(1, Math.floor(wrap.clientWidth));
-    const h = Math.max(1, Math.floor(wrap.clientHeight));
+    const h = Math.max(1, Math.floor(wrap.clientHeight * PAGE_FACTOR));
     if (preserve && canvas.width > 1 && canvas.height > 1) {
       const sx = (w * dpr) / canvas.width;
       const sy = (h * dpr) / canvas.height;
@@ -112,6 +117,7 @@ export default function DrawingPad({ open, onClose, onSave }) {
   };
 
   const onDown = (e) => {
+    if (mode !== 'draw') return; // scroll mode: let the page scroll
     if (e.cancelable) e.preventDefault();
     const { tool: t, color: c, width: w } = settingsRef.current;
     currentRef.current = { tool: t, color: c, width: w, points: [pointFromEvent(e)] };
@@ -206,11 +212,20 @@ export default function DrawingPad({ open, onClose, onSave }) {
         </button>
       </div>
 
-      {/* Pen / eraser + size stepper */}
+      {/* Pen / eraser / scroll + size stepper */}
       <div className="flex items-center justify-center gap-3 pb-2 flex-shrink-0">
         <button
           type="button"
-          onClick={() => setTool('pen')}
+          onClick={() => setMode((m) => (m === 'draw' ? 'scroll' : 'draw'))}
+          className="w-9 h-9 rounded-full flex items-center justify-center cursor-pointer"
+          style={{ background: mode === 'scroll' ? 'rgba(255,255,255,0.15)' : 'transparent', color: '#fff' }}
+          title={mode === 'draw' ? 'Scroll mode: swipe to move around the page' : 'Draw mode'}
+        >
+          <Hand className="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => { setTool('pen'); setMode('draw'); }}
           className="w-9 h-9 rounded-full flex items-center justify-center cursor-pointer"
           style={{ background: tool === 'pen' ? 'rgba(255,255,255,0.15)' : 'transparent', color: '#fff' }}
           title="Pen"
@@ -219,7 +234,7 @@ export default function DrawingPad({ open, onClose, onSave }) {
         </button>
         <button
           type="button"
-          onClick={() => setTool('eraser')}
+          onClick={() => { setTool('eraser'); setMode('draw'); }}
           className="w-9 h-9 rounded-full flex items-center justify-center cursor-pointer"
           style={{ background: tool === 'eraser' ? 'rgba(255,255,255,0.15)' : 'transparent', color: '#fff' }}
           title="Eraser"
@@ -251,12 +266,12 @@ export default function DrawingPad({ open, onClose, onSave }) {
         </div>
       </div>
 
-      {/* Canvas */}
-      <div ref={wrapRef} className="flex-1 min-h-0">
+      {/* Canvas — tall scrollable page */}
+      <div ref={wrapRef} className="flex-1 min-h-0 overflow-y-auto">
         <canvas
           ref={canvasRef}
-          className="w-full h-full block"
-          style={{ touchAction: 'none' }}
+          className="w-full block"
+          style={{ height: '250%', touchAction: mode === 'scroll' ? 'pan-y' : 'none' }}
           onPointerDown={onDown}
           onPointerMove={onMove}
           onPointerUp={onUp}
